@@ -1,6 +1,6 @@
-%% YAP TAZ analysis
-stiffnessVals = 1e5;%logspace(-1,3,50);
-inhibMag = 0:.1:10;%0:.1:5;%0:.1:1;
+%% Test mechano-Circadian model under different conditions
+stiffnessVals = logspace(-1,3,50);
+inhibMag = 0:.1:10;
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
 inhibMag = inhibMesh(:);
@@ -17,14 +17,14 @@ FcytoEq = zeros(size(stiffnessVals));
 GactinEq = zeros(size(stiffnessVals));
 figure
 hold on
-colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0];
+colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plots
 % colorSeries = [0,0,0; 0,.25,.66; .57,.75,.98];
 % colorSeries = colororder;
 for i = 1:length(stiffnessVals)
 %     coupleParam(1,1) = ratioVals(i)*.5/3600;
 %     coupleParam(2,1) = (1-ratioVals(i))*.5/3600;
-%     paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
-    paramList = pSol;
+    paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
+    % paramList = pSol;
     actinInhib =  1;%1 / (1 + (inhibMag(i)/paramList(18)));
     ROCKInhib = 1;% / (1 + (inhibMag(i)/2));
     MRTFInhib = 1;%inhibMag(i);
@@ -183,38 +183,6 @@ pSol = particleswarm(@pToObj_CircadianClock, length(p0), lowerLim, upperLim, opt
 pToObj_CircadianClock(pSol)
 save('pSol_justPeriodWrongTrend_var4x.mat','pSol')
 
-%% Fit MRTF
-MRTFParamInit = [1.5e6; 1; 10; 1; 100; 0.0461];
-lowerLim = MRTFParamInit/10;
-upperLim = MRTFParamInit*10;
-% lowerLim([1]) = MRTFParamInit([1]);
-% upperLim([1]) = MRTFParamInit([1]);
-options = optimoptions('particleswarm','UseParallel',true,'HybridFcn',@fmincon, 'FunctionTolerance', 1e-9);%, 'MaxTime', 60*20);
-pSolMRTF = particleswarm(@pToObj_MRTF, length(MRTFParamInit), lowerLim, upperLim, options);%p0);
-% pSolMRTF = lsqnonlin(@pToF_MRTF, MRTFParamInit, lowerLim, upperLim);
-pToObj_MRTF(pSolMRTF)
-
-%% plot MRTF cases
-stiffnessVals = logspace(-1,4,100);
-inhibVals = linspace(0,2,100);
-MRTFEq = zeros(size(stiffnessVals));
-YAPTAZEq = zeros(size(stiffnessVals));
-FactinEq = zeros(size(stiffnessVals));
-GactinEq = zeros(size(stiffnessVals));
-for i = 1:length(stiffnessVals)
-    inhibVec = [1,1,1,1, 0];
-    stiffnessVec = [stiffnessVals(i),inf,0];
-%     stiffnessVec = [1e5,inf,0];
-    SSVar = MechanoSS(stiffnessVec, inhibVec, pSolMRTF);
-    MRTFEq(i) = SSVar(25)/SSVar(26);
-    YAPTAZEq(i) = SSVar(15)/(SSVar(17)+SSVar(18));
-    FactinEq(i) = SSVar(5);
-    GactinEq(i) = SSVar(9);
-end
-% semilogx(stiffnessVals,YAPTAZEq)
-% hold on
-% semilogx(stiffnessVals,MRTFEq)
-% hold on
 
 function obj = pToObj_CircadianClock(p)
     maxTime = 3600*1000;
@@ -263,32 +231,4 @@ function obj = pToObj_CircadianClock(p)
 %     obj = sum(50*((periodTest - periodVec1)./periodVec1).^2 + ((amplTest - amplVec1)./amplVec1).^2);% +...
 %         sum(50*((periodTest - periodVec2)./periodVec2).^2 + ((amplTest - amplVec2)./amplVec2).^2);
 %     obj = sum(50*((periodTest - periodVec)./periodVec).^2 + ((amplTest - amplVec)./amplVec).^2);
-end
-
-function obj = pToObj_MRTF(p)
-    stiffnessTests = [1, 1, 1e5, 1e5];
-    cytDTests = [0, 2.5, 0, 2.5];
-    MRTFEqData = [0.5, 0.8, 1, 4];
-    MRTFEqTest = zeros(size(MRTFEqData));
-    for i = 1:length(cytDTests)
-        inhibVec = [1,1,1,1, cytDTests(i)];
-        stiffnessVec = [stiffnessTests(i),inf,0];
-        SSVar = MechanoSS(stiffnessVec, inhibVec, p);
-        MRTFEqTest(i) = SSVar(25)/SSVar(26);
-    end
-    obj = sum((MRTFEqData-MRTFEqTest).^2);
-end
-
-function F = pToF_MRTF(p)
-    stiffnessTests = [1, 1, 1e5, 1e5];
-    cytDTests = [0, 2.5, 0, 2.5];
-    MRTFEqData = [0.5, 0.8, 1, 4];
-    MRTFEqTest = zeros(size(MRTFEqData));
-    for i = 1:length(cytDTests)
-        inhibVec = [1,1,1,1, cytDTests(i)];
-        stiffnessVec = [stiffnessTests(i),inf,0];
-        SSVar = MechanoSS(stiffnessVec, inhibVec, p);
-        MRTFEqTest(i) = SSVar(25)/SSVar(26);
-    end
-    F = abs(MRTFEqData - MRTFEqTest);
 end

@@ -34,10 +34,11 @@ end
 
 %% Fit values for desired shift in periods
 couplingRef = 1.0 / (1000.0 * 3600.0);
-couplingParam0 = 0.1*couplingRef*ones(8,1);
+couplingParam0 = 0.54*couplingRef*ones(8,1);
 lowerLim = zeros(size(couplingParam0));
 upperLim = couplingParam0*2;
-options = optimoptions('particleswarm','UseParallel',true,'HybridFcn',@fmincon);%, 'MaxTime', 60*20);
+options = optimoptions('particleswarm','UseParallel', false,'HybridFcn',@fmincon,...
+    'PlotFcn','pswplotbestf','FunctionTolerance',1e-3,'MaxStallIterations',10);%, 'MaxTime', 60*20);
 pSol = particleswarm(@pToObj_FullCoupling, length(couplingParam0), lowerLim, upperLim, options);%p0);
 pToObj_FullCoupling(pSol)
 
@@ -54,7 +55,7 @@ mBMAL1_avg = zeros(size(stiffnessVals));
 figure
 hold on
 for i = 1:length(stiffnessVals)
-    [T,Y] = YAPTAZ_FullClockNew(tRange,[],[],stiffnessVals(i),couplingSol);
+    [T,Y] = MechanoCircadianModel_full(tRange,[],[],stiffnessVals(i),couplingSol);
     [pks,locs] = findpeaks(Y(:,oscVarIdx),'MinPeakProminence',.01*1e-3);
     [troughs,troughLocs] = findpeaks(-Y(:,oscVarIdx),'MinPeakProminence',.01*1e-3);
     mPER_avg(i) = trapz(T,Y(:,17))/range(T);
@@ -83,7 +84,7 @@ function obj = pToObj_FullCoupling(couplingParam)
     periodTest = zeros(size(periodVec1));
     amplTest = zeros(size(amplVec1));
     for i = 1:length(stiffnessTests)
-        [t,y] = YAPTAZ_FullClockNew([0 maxTime], [], [], stiffnessTests(i), couplingParam);
+        [t,y] = MechanoCircadianModel_full([0 maxTime], [], [], stiffnessTests(i), couplingParam);
         if any(~isreal(y))
             obj = 1e6;
             return

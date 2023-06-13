@@ -79,3 +79,64 @@ end
 if saveVid
     close(myVideo)
 end
+
+%% Fit MRTF
+MRTFParamInit = [1.5e6; 1; 10; 1; 100; 0.0461];
+lowerLim = MRTFParamInit/10;
+upperLim = MRTFParamInit*10;
+% lowerLim([1]) = MRTFParamInit([1]);
+% upperLim([1]) = MRTFParamInit([1]);
+options = optimoptions('particleswarm','UseParallel',true,'HybridFcn',@fmincon, 'FunctionTolerance', 1e-9);%, 'MaxTime', 60*20);
+pSolMRTF = particleswarm(@pToObj_MRTF, length(MRTFParamInit), lowerLim, upperLim, options);%p0);
+% pSolMRTF = lsqnonlin(@pToF_MRTF, MRTFParamInit, lowerLim, upperLim);
+pToObj_MRTF(pSolMRTF)
+
+%% plot MRTF cases
+stiffnessVals = logspace(-1,4,100);
+inhibVals = linspace(0,2,100);
+MRTFEq = zeros(size(stiffnessVals));
+YAPTAZEq = zeros(size(stiffnessVals));
+FactinEq = zeros(size(stiffnessVals));
+GactinEq = zeros(size(stiffnessVals));
+for i = 1:length(stiffnessVals)
+    inhibVec = [1,1,1,1, 0];
+    stiffnessVec = [stiffnessVals(i),inf,0];
+%     stiffnessVec = [1e5,inf,0];
+    SSVar = MechanoSS(stiffnessVec, inhibVec, pSolMRTF);
+    MRTFEq(i) = SSVar(25)/SSVar(26);
+    YAPTAZEq(i) = SSVar(15)/(SSVar(17)+SSVar(18));
+    FactinEq(i) = SSVar(5);
+    GactinEq(i) = SSVar(9);
+end
+% semilogx(stiffnessVals,YAPTAZEq)
+% hold on
+% semilogx(stiffnessVals,MRTFEq)
+% hold on
+
+function obj = pToObj_MRTF(p)
+    stiffnessTests = [1, 1, 1e5, 1e5];
+    cytDTests = [0, 2.5, 0, 2.5];
+    MRTFEqData = [0.5, 0.8, 1, 4];
+    MRTFEqTest = zeros(size(MRTFEqData));
+    for i = 1:length(cytDTests)
+        inhibVec = [1,1,1,1, cytDTests(i)];
+        stiffnessVec = [stiffnessTests(i),inf,0];
+        SSVar = MechanoSS(stiffnessVec, inhibVec, p);
+        MRTFEqTest(i) = SSVar(25)/SSVar(26);
+    end
+    obj = sum((MRTFEqData-MRTFEqTest).^2);
+end
+
+function F = pToF_MRTF(p)
+    stiffnessTests = [1, 1, 1e5, 1e5];
+    cytDTests = [0, 2.5, 0, 2.5];
+    MRTFEqData = [0.5, 0.8, 1, 4];
+    MRTFEqTest = zeros(size(MRTFEqData));
+    for i = 1:length(cytDTests)
+        inhibVec = [1,1,1,1, cytDTests(i)];
+        stiffnessVec = [stiffnessTests(i),inf,0];
+        SSVar = MechanoSS(stiffnessVec, inhibVec, p);
+        MRTFEqTest(i) = SSVar(25)/SSVar(26);
+    end
+    F = abs(MRTFEqData - MRTFEqTest);
+end
