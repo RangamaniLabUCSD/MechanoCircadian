@@ -1,4 +1,4 @@
-function [T,Y,yinit,param, allNames, allValues] = YAPTAZ_FullClockNew(argTimeSpan,argYinit,argParam,stiffnessVal,couplingParam)
+function [T,Y,yinit,param, allNames, allValues] = MechanoCircadianModel_full(argTimeSpan,argYinit,argParam,stiffnessVal,couplingParam)
 % [T,Y,yinit,param] = YAPTAZ_FullClockNew(argTimeSpan,argYinit,argParam)
 %
 % input:

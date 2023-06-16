@@ -1,4 +1,4 @@
-function [T,Y,yinit,param, allNames, allValues] = CircadianOnly_full(argTimeSpan,argYinit,circad_param)
+function [T,Y] = CircadianOnly_full(timeSpan, circad_param, mechanoVals)
 % [T,Y,yinit,param] = CircadianOnly_full(argTimeSpan,argYinit,argParam)
 %
 % input:
@@ -17,23 +17,6 @@ function [T,Y,yinit,param, allNames, allValues] = CircadianOnly_full(argTimeSpan
 %     example of running this file: [T,Y,yinit,param,allNames,allValues] = myMatlabFunc; <-(your main function name)
 %
 
-%
-% Default time span
-%
-timeSpan = [0.0 1.0];
-
-% output variable lengh and names
-numVars = 170;
-allNames = {'PERCRYnuc';'BMAL1';'PERCRY_CLOCKBMAL1';'BMAL1_mRNA';'REV';'BMAL1nuc';'PER_mRNA';'MRTFnuc';'BMAL1nuc_p';'PERCRY_p';'REV_mRNA';'CRY';'PERCRYnuc_p';'YAPTAZnuc';'PER_p';'PERCRY';'CRY_mRNA';'PER';'REVnuc';'CRY_p';'BMAL1_p';'UnitFactor_uM_um3_molecules_neg_1';'nu_dRC';'K_d_r36';'K_d_r32';'k_sC';'LumpedJ_r44';'K_d_r30';'k_sP';'LumpedJ_r42';'k_9';'k_6';'k_5';'k_dnC';'J_r39';'K_d_r38';'k_dn_r38';'nu_dCC';'J_r38';'k_dn_r37';'J_r37';'k_2';'nu_dPCC';'k_dn_r36';'J_r36';'k_1';'V_1P';'K_dp_r35';'K_p_r35';'V_2P';'J_r35';'V_2C';'V_1C';'K_p_r34';'K_dp_r34';'J_r34';'K_dp_r33';'K_p_r33';'V_2PC';'V_1PC';'J_r33';'nu_dBN';'k_dn_r32';'J_r32';'k_dn_r31';'J_r31';'k_dn_r30';'nu_dBC';'J_r30';'K_d_r26';'K_d_r24';'k_dn_r29';'J_r29';'k_dmB';'nu_mB';'K_mB';'J_r28';'nu_sB';'nu_YTB';'K_IB';'J_r27';'k_dn_r26';'nu_dRN';'J_r26';'k_dmr';'nu_mR';'K_mR';'J_r25';'k_dn_r24';'J_r24';'nu_sR';'K_AR';'J_r23';'V_2B';'V_1B';'K_dp_r20';'K_p_r20';'J_r20';'nu_dPC';'k_10';'Kr';'Kf';'LumpedJ_r22';'LumpedJ_r21';'K_p_r52';'V_3B';'K_p_r19';'K_dp_r19';'V_4B';'J_r19';'KFlux_NM_Nuc';'k_sB';'LumpedJ_r18';'k_sR';'LumpedJ_r17';'K_AP';'K_AC';'nu_MRTF_r49';'k_4_r51';'nu_MRTF_r46';'nu_sP';'k_4_r45';'k_4_r43';'nu_sC';'k_3_r51';'nu_dPCN';'k_3_r45';'k_3_r43';'nu_dIN';'K_mP';'K_mC';'nu_mP';'nu_mC';'KFlux_NM_Cyto';'k_dn_r58';'k_dn_r54';'k_dn_r53';'k_dn_r41';'k_dn_r40';'K_dp_r52';'V_4PC';'k_dmp';'k_dmc';'k_8_r57';'K_d_r58';'k_8_r56';'k_8_r55';'K_d_r54';'V_3PC';'J_r58';'k_7_r57';'J_r57';'k_7_r56';'J_r56';'k_7_r55';'J_r55';'J_r54';'J_r53';'J_r52';'J_r51';'K_d_r40';'LumpedJ_r50';'J_r49';'J_r48';'J_r47';'J_r46';'J_r45';'J_r43';'J_r41';'J_r40';};
-
-if nargin >= 1
-	if length(argTimeSpan) > 0
-		%
-		% TimeSpan overridden by function arguments
-		%
-		timeSpan = argTimeSpan;
-	end
-end
 %
 % Default Initial Conditions
 %
@@ -60,14 +43,10 @@ yinit = [
 	0.0;		% yinit(20) is the initial condition for 'CRY_p'
 	0.0;		% yinit(21) is the initial condition for 'BMAL1_p'
 ];
-if nargin >= 2
-	if length(argYinit) > 0
-		%
-		% initial conditions overridden by function arguments
-		%
-		yinit = argYinit;
-	end
-end
+
+yinit(14) = mechanoVals(1); % value of YAPTAZNuc
+yinit(8) = mechanoVals(2); % value of MRTFNuc
+
 %
 % Default Parameters
 %   constants are only those "Constants" from the Math Description that are just floating point numbers (no identifiers)
@@ -162,26 +141,12 @@ param = [
 	0.0;		% param(86) is 'PERCRY_CLOCKBMAL1_init_uM'
 	1.0;		% param(87) is 'K_MRTF_r49'
 ];
-if nargin >= 3
-	if length(argParam) > 0
-		%
-		% parameter values overridden by function arguments
-		%
-		param = argParam;
-	end
-end
+
 %
 % invoke the integrator
 %
-[T,Y] = ode15s(@f,timeSpan,yinit,odeset('OutputFcn',@odeplot),param,yinit,circad_param);
+[T,Y] = ode15s(@f,timeSpan,yinit,odeset(),param,yinit,circad_param);
 
-% get the solution
-all = zeros(length(T), numVars);
-for i = 1:length(T)
-	all(i,:) = getRow(T(i), Y(i,:), yinit, param);
-end
-
-allValues = all;
 end
 
 
@@ -225,119 +190,117 @@ function dydt = f(t,y,p,y0, circad_param)
 	K_YTB = p(83);
 	K_MRTF_r49 = p(87);
     
-    couplingParam = zeros(2,4);
-    couplingParam(1,:) = circad_param(1:4);
-    couplingParam(2,:) = circad_param(5:8);
-    nu_YTB = couplingParam(1,1);
-    nu_YTP = couplingParam(1,2);
-    nu_YTC = couplingParam(1,3);
-    nu_YTR = couplingParam(1,4);
-    nu_MRTF_B = couplingParam(2,1);
-	nu_MRTF_P = couplingParam(2,2);
-    nu_MRTF_C = couplingParam(2,3);
-    nu_MRTF_R = couplingParam(2,4);
+    couplingRef = 0.5 / (1000.0 * 3600.0);
+    nu_YTB = couplingRef *    circad_param(1);
+    nu_YTP = couplingRef *    circad_param(2);
+    nu_YTC = couplingRef *    circad_param(3);
+    nu_YTR = couplingRef *    circad_param(4);
+    nu_MRTF_B = couplingRef * circad_param(5);
+	nu_MRTF_P = couplingRef * circad_param(6);
+    nu_MRTF_C = couplingRef * circad_param(7);
+    nu_MRTF_R = couplingRef * circad_param(8);
     YAPTAZHillFcn = ((YAPTAZnuc ^ q_r27)) ./ ((K_YTB ^ q_r27) + (YAPTAZnuc ^ q_r27));
     MRTFHillFcn = (MRTFnuc ^ q_r49) ./ ((K_MRTF_r49 ^ q_r49) + (MRTFnuc ^ q_r49));
 
-	nu_dRC = (4.4 .* 0.001 ./ 3600.0);
-	K_d_r36 = (0.3 ./ 1000.0);
-	K_d_r32 = (0.3 .* 0.001);
-	k_sC = (3.2 ./ 3600.0);
-	K_d_r30 = (0.3 .* 0.001);
-	k_sP = (1.2 ./ 3600.0);
-	k_9 = (0.8 ./ 3600.0);
-	k_6 = (0.8 ./ 3600.0);
-	k_5 = (0.8 ./ 3600.0);
-	k_dnC = (0.02 ./ 3600.0);
-	K_d_r38 = (0.3 ./ 1000.0);
-	k_dn_r38 = (0.02 ./ 3600.0);
-	nu_dCC = (1.4 ./ (1000.0 .* 3600.0));
-	k_dn_r37 = (0.02 ./ 3600.0);
-	k_2 = (0.4 ./ 3600.0);
-	nu_dPCC = (1.4 ./ (1000.0 .* 3600.0));
-	k_dn_r36 = (0.02 ./ 3600.0);
-	k_1 = (0.8 ./ 3600.0);
-	V_1P = (9.6 ./ (1000.0 .* 3600.0));
-	K_dp_r35 = (0.1 ./ 1000.0);
-	K_p_r35 = (1.006 ./ 1000.0);
-	V_2P = (0.6 ./ (1000.0 .* 3600.0));
-	V_2C = (0.2 ./ (1000.0 .* 3600.0));
-	V_1C = (1.2 ./ (1000.0 .* 3600.0));
-	K_p_r34 = (1.006 ./ 1000.0);
-	K_dp_r34 = (0.1 ./ 1000.0);
-	K_dp_r33 = (0.1 ./ 1000.0);
-	K_p_r33 = (1.006 ./ 1000.0);
-	V_2PC = (0.2 ./ (1000.0 .* 3600.0));
-	V_1PC = (2.4 ./ (1000.0 .* 3600.0));
-	nu_dBN = (3.0 .* 0.001 ./ 3600.0);
-	k_dn_r32 = (0.02 ./ 3600.0);
-	k_dn_r31 = (0.02 ./ 3600.0);
-	k_dn_r30 = (0.02 ./ 3600.0);
-	nu_dBC = (3.0 .* 0.001 ./ 3600.0);
-	K_d_r26 = (0.3 .* 0.001);
-	K_d_r24 = (0.3 .* 0.001);
-	k_dn_r29 = (0.02 ./ 3600.0);
-	k_dmB = (0.02 ./ 3600.0);
-	nu_mB = (1.3 .* 0.001 ./ 3600.0);
-	K_mB = (0.4 .* 0.001);
-	nu_sB = (1.8 .* 0.001 ./ 3600.0);
-	K_IB = (2.2 .* 0.001);
-	k_dn_r26 = (0.02 ./ 3600.0);
-	nu_dRN = (0.8 .* 0.001 ./ 3600.0);
-	k_dmr = (0.02 ./ 3600.0);
-	nu_mR = (1.6 .* 0.001 ./ 3600.0);
-	K_mR = (0.4 .* 0.001);
-	k_dn_r24 = (0.02 ./ 3600.0);
-	nu_sR = (1.6 .* 0.001 ./ 3600.0);
-	K_AR = (0.6 .* 0.001);
-	V_2B = (0.2 .* 0.001 ./ 3600.0);
-	V_1B = (1.4 .* 0.001 ./ 3600.0);
-	K_dp_r20 = (0.1 .* 0.001);
-	K_p_r20 = (1.006 .* 0.001);
-	nu_dPC = (3.4 ./ (1000.0 .* 3600.0));
-	k_10 = (0.4 ./ 3600.0);
-	K_p_r52 = (1.006 ./ 1000.0);
-	V_3B = (1.4 .* 0.001 ./ 3600.0);
-	K_p_r19 = (1.006 .* 0.001);
-	K_dp_r19 = (0.1 .* 0.001);
-	V_4B = (0.4 .* 0.001 ./ 3600.0);
-	k_sB = (0.32 ./ 3600.0);
-	k_sR = (1.7 ./ 3600.0);
-	K_AP = (0.6 ./ 1000.0);
-	K_AC = (0.6 ./ 1000.0);
-	k_4_r51 = (0.4 ./ 3600.0);
-	nu_sP = (2.4 ./ (1000.0 .* 3600.0));
-	k_4_r45 = (0.4 ./ 3600.0);
-	k_4_r43 = (0.4 ./ 3600.0);
-	nu_sC = (2.2 ./ (1000.0 .* 3600.0));
-	k_3_r51 = (0.8 .* 1000.0 ./ 3600.0);
-	nu_dPCN = (1.4 ./ (1000.0 .* 3600.0));
-	k_3_r45 = (0.8 .* 1000.0 ./ 3600.0);
-	k_3_r43 = (0.8 .* 1000.0 ./ 3600.0);
-	nu_dIN = (1.6 ./ (1000.0 .* 3600.0));
-	K_mP = (0.3 ./ 1000.0);
-	K_mC = (0.4 ./ 1000.0);
-	nu_mP = (2.2 ./ (1000.0 .* 3600.0));
-	nu_mC = (2.0 ./ (1000.0 .* 3600.0));
-	k_dn_r58 = (0.02 ./ 3600.0);
-	k_dn_r54 = (0.02 ./ 3600.0);
-	k_dn_r53 = (0.02 ./ 3600.0);
-	k_dn_r41 = (0.02 ./ 3600.0);
-	k_dn_r40 = (0.02 ./ 3600.0);
-	K_dp_r52 = (0.1 ./ 1000.0);
-	V_4PC = (0.2 ./ (1000.0 .* 3600.0));
-	k_dmp = (0.02 ./ 3600.0);
-	k_dmc = (0.02 ./ 3600.0);
-	k_8_r57 = (0.2 ./ 3600.0);
-	K_d_r58 = (0.3 ./ 1000.0);
-	k_8_r56 = (0.2 ./ 3600.0);
-	k_8_r55 = (0.2 ./ 3600.0);
-	K_d_r54 = (0.3 ./ 1000.0);
-	V_3PC = (2.4 ./ (1000.0 .* 3600.0));
-	k_7_r57 = (1.0 .* 1000.0 ./ 3600.0);
-	k_7_r56 = (1.0 .* 1000.0 ./ 3600.0);
-	k_7_r55 = (1.0 .* 1000.0 ./ 3600.0);
-	K_d_r40 = (0.3 ./ 1000.0);
+	nu_dRC = (4.4 .* 0.001 ./ 3600.0)        * circad_param(9);
+	K_d_r36 = (0.3 ./ 1000.0)                * circad_param(10); 
+	K_d_r32 = (0.3 .* 0.001)                 * circad_param(11);
+	k_sC = (3.2 ./ 3600.0)                   * circad_param(12);
+	K_d_r30 = (0.3 .* 0.001)                 * circad_param(13);
+	k_sP = (1.2 ./ 3600.0)                   * circad_param(14);
+	k_9 = (0.8 ./ 3600.0)                    * circad_param(15);
+	k_6 = (0.8 ./ 3600.0)                    * circad_param(16);
+	k_5 = (0.8 ./ 3600.0)                    * circad_param(17);
+	k_dnC = (0.02 ./ 3600.0)                 * circad_param(18);
+	K_d_r38 = (0.3 ./ 1000.0)                * circad_param(19);
+	k_dn_r38 = (0.02 ./ 3600.0)              * circad_param(20);  
+	nu_dCC = (1.4 ./ (1000.0 .* 3600.0))     * circad_param(21);
+	k_dn_r37 = (0.02 ./ 3600.0)              * circad_param(22);
+	k_2 = (0.4 ./ 3600.0)                    * circad_param(23); 
+	nu_dPCC = (1.4 ./ (1000.0 .* 3600.0))    * circad_param(24); 
+	k_dn_r36 = (0.02 ./ 3600.0)              * circad_param(25);
+	k_1 = (0.8 ./ 3600.0)                    * circad_param(26);
+	V_1P = (9.6 ./ (1000.0 .* 3600.0))       * circad_param(27);
+	K_dp_r35 = (0.1 ./ 1000.0)               * circad_param(28);
+	K_p_r35 = (1.006 ./ 1000.0)              * circad_param(29);
+	V_2P = (0.6 ./ (1000.0 .* 3600.0))       * circad_param(30);
+	V_2C = (0.2 ./ (1000.0 .* 3600.0))       * circad_param(31);
+	V_1C = (1.2 ./ (1000.0 .* 3600.0))       * circad_param(33);
+	K_p_r34 = (1.006 ./ 1000.0)              * circad_param(34);
+	K_dp_r34 = (0.1 ./ 1000.0)               * circad_param(35);
+	K_dp_r33 = (0.1 ./ 1000.0)               * circad_param(36);
+	K_p_r33 = (1.006 ./ 1000.0)              * circad_param(37);
+	V_2PC = (0.2 ./ (1000.0 .* 3600.0))      * circad_param(38);
+	V_1PC = (2.4 ./ (1000.0 .* 3600.0))      * circad_param(39);
+	nu_dBN = (3.0 .* 0.001 ./ 3600.0)        * circad_param(40);
+	k_dn_r32 = (0.02 ./ 3600.0)              * circad_param(41);
+	k_dn_r31 = (0.02 ./ 3600.0)              * circad_param(42);
+	k_dn_r30 = (0.02 ./ 3600.0)              * circad_param(43);
+	nu_dBC = (3.0 .* 0.001 ./ 3600.0)        * circad_param(44);
+	K_d_r26 = (0.3 .* 0.001)                 * circad_param(45);
+	K_d_r24 = (0.3 .* 0.001)                 * circad_param(46);
+	k_dn_r29 = (0.02 ./ 3600.0)              * circad_param(47);
+	k_dmB = (0.02 ./ 3600.0)                 * circad_param(48);
+	nu_mB = (1.3 .* 0.001 ./ 3600.0)         * circad_param(49);
+	K_mB = (0.4 .* 0.001)                    * circad_param(50);
+	nu_sB = (1.8 .* 0.001 ./ 3600.0)         * circad_param(51);
+	K_IB = (2.2 .* 0.001)                    * circad_param(52);
+	k_dn_r26 = (0.02 ./ 3600.0)              * circad_param(53);
+	nu_dRN = (0.8 .* 0.001 ./ 3600.0)        * circad_param(54);
+	k_dmr = (0.02 ./ 3600.0)                 * circad_param(55);
+	nu_mR = (1.6 .* 0.001 ./ 3600.0)         * circad_param(56);
+	K_mR = (0.4 .* 0.001)                    * circad_param(57);
+	k_dn_r24 = (0.02 ./ 3600.0)              * circad_param(58);
+	nu_sR = (1.6 .* 0.001 ./ 3600.0)         * circad_param(59);
+	K_AR = (0.6 .* 0.001)                    * circad_param(60);
+	V_2B = (0.2 .* 0.001 ./ 3600.0)          * circad_param(61);
+	V_1B = (1.4 .* 0.001 ./ 3600.0)          * circad_param(62);
+	K_dp_r20 = (0.1 .* 0.001)                * circad_param(63);
+	K_p_r20 = (1.006 .* 0.001)               * circad_param(64);
+	nu_dPC = (3.4 ./ (1000.0 .* 3600.0))     * circad_param(65);
+	k_10 = (0.4 ./ 3600.0)                   * circad_param(66);
+	K_p_r52 = (1.006 ./ 1000.0)              * circad_param(67);
+	V_3B = (1.4 .* 0.001 ./ 3600.0)          * circad_param(68);
+	K_p_r19 = (1.006 .* 0.001)               * circad_param(69);
+	K_dp_r19 = (0.1 .* 0.001)                * circad_param(70);
+	V_4B = (0.4 .* 0.001 ./ 3600.0)          * circad_param(71);
+	k_sB = (0.32 ./ 3600.0)                  * circad_param(72);
+	k_sR = (1.7 ./ 3600.0)                   * circad_param(73);
+	K_AP = (0.6 ./ 1000.0)                   * circad_param(74);
+	K_AC = (0.6 ./ 1000.0)                   * circad_param(75);
+	k_4_r51 = (0.4 ./ 3600.0)                * circad_param(76);
+	nu_sP = (2.4 ./ (1000.0 .* 3600.0))      * circad_param(77);
+	k_4_r45 = (0.4 ./ 3600.0)                * circad_param(78);
+	k_4_r43 = (0.4 ./ 3600.0)                * circad_param(79);
+	nu_sC = (2.2 ./ (1000.0 .* 3600.0))      * circad_param(80);
+	k_3_r51 = (0.8 .* 1000.0 ./ 3600.0)      * circad_param(81);
+	nu_dPCN = (1.4 ./ (1000.0 .* 3600.0))    * circad_param(82);
+	k_3_r45 = (0.8 .* 1000.0 ./ 3600.0)      * circad_param(83);
+	k_3_r43 = (0.8 .* 1000.0 ./ 3600.0)      * circad_param(84);
+	nu_dIN = (1.6 ./ (1000.0 .* 3600.0))     * circad_param(85);
+	K_mP = (0.3 ./ 1000.0)                   * circad_param(86);
+	K_mC = (0.4 ./ 1000.0)                   * circad_param(87);
+	nu_mP = (2.2 ./ (1000.0 .* 3600.0))      * circad_param(88);
+	nu_mC = (2.0 ./ (1000.0 .* 3600.0))      * circad_param(89);
+	k_dn_r58 = (0.02 ./ 3600.0)              * circad_param(90);
+	k_dn_r54 = (0.02 ./ 3600.0)              * circad_param(91);
+	k_dn_r53 = (0.02 ./ 3600.0)              * circad_param(92);
+	k_dn_r41 = (0.02 ./ 3600.0)              * circad_param(93);
+	k_dn_r40 = (0.02 ./ 3600.0)              * circad_param(94);
+	K_dp_r52 = (0.1 ./ 1000.0)               * circad_param(95);
+	V_4PC = (0.2 ./ (1000.0 .* 3600.0))      * circad_param(96);
+	k_dmp = (0.02 ./ 3600.0)                 * circad_param(97);
+	k_dmc = (0.02 ./ 3600.0)                 * circad_param(98);
+	k_8_r57 = (0.2 ./ 3600.0)                * circad_param(99);
+	K_d_r58 = (0.3 ./ 1000.0)                * circad_param(100);
+	k_8_r56 = (0.2 ./ 3600.0)                * circad_param(101);
+	k_8_r55 = (0.2 ./ 3600.0)                * circad_param(102);
+	K_d_r54 = (0.3 ./ 1000.0)                * circad_param(103);
+	V_3PC = (2.4 ./ (1000.0 .* 3600.0))      * circad_param(104);
+	k_7_r57 = (1.0 .* 1000.0 ./ 3600.0)      * circad_param(105);
+	k_7_r56 = (1.0 .* 1000.0 ./ 3600.0)      * circad_param(106);
+	k_7_r55 = (1.0 .* 1000.0 ./ 3600.0)      * circad_param(107);
+	K_d_r40 = (0.3 ./ 1000.0)                * circad_param(108);
 
 
 	% Functions

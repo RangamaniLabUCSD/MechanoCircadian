@@ -1,4 +1,4 @@
-function [SSVar, tauVals] = mechSS(stiffnessParam, inhibVec, MRTFParam)
+function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
     param = [
         0.648;		% param(1) is 'krp'
         0.14;		% param(2) is 'kNC'

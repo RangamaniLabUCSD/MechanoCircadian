@@ -108,10 +108,11 @@ for i = 1:length(stiffnessVals)
     FactinEq(i) = SSVar(5);
     GactinEq(i) = SSVar(9);
 end
-% semilogx(stiffnessVals,YAPTAZEq)
-% hold on
-% semilogx(stiffnessVals,MRTFEq)
-% hold on
+figure
+semilogx(stiffnessVals,YAPTAZEq)
+hold on
+semilogx(stiffnessVals,MRTFEq)
+hold on
 
 function obj = pToObj_MRTF(p)
     stiffnessTests = [1, 1, 1e5, 1e5];

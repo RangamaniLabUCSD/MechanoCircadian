@@ -33,34 +33,44 @@ for i = 1:length(nu_YTBMesh(:))
 end
 
 %% Fit values for desired shift in periods
-couplingRef = 1.0 / (1000.0 * 3600.0);
-couplingParam0 = 0.54*couplingRef*ones(8,1);
-lowerLim = zeros(size(couplingParam0));
-upperLim = couplingParam0*2;
+% couplingRef = 1.0 / (1000.0 * 3600.0);
+% couplingParam0 = 0.5*couplingRef*ones(8,1);
+lowerLim = 0.8*ones(108,1);
+upperLim = 1.25*ones(108,1);
+lowerLim(1:8) = 0;
+upperLim(1:8) = 5;
+% could restrict coupling to postulated connections from papers
+upperLim(2:3) = 0; % no YAP/TAZ coupling to PER/CRY
+upperLim([5,8]) = 0; % no MRTF coupling to BMAL or REVERB
 options = optimoptions('particleswarm','UseParallel', false,'HybridFcn',@fmincon,...
     'PlotFcn','pswplotbestf','FunctionTolerance',1e-3,'MaxStallIterations',10);%, 'MaxTime', 60*20);
-pSol = particleswarm(@pToObj_FullCoupling, length(couplingParam0), lowerLim, upperLim, options);%p0);
+pSol = particleswarm(@pToObj_FullCoupling, length(lowerLim), lowerLim, upperLim, options);%p0);
 pToObj_FullCoupling(pSol)
 
 %% plot different stiffnesses
-couplingSol = reshape(pSol,[4,2])';
+circad_param = pSol;
+% couplingSol = reshape(pSol,[4,2])';
 stiffnessVals = logspace(-1,3,20);
 tRange = [0, 3600*500];
-oscVarIdx = 42;
+oscVarIdx = 18;
 period = zeros(size(stiffnessVals));
 ampl = zeros(size(stiffnessVals));
-mPER_avg = zeros(size(stiffnessVals));
-mCRY_avg = zeros(size(stiffnessVals));
-mBMAL1_avg = zeros(size(stiffnessVals));
+% mPER_avg = zeros(size(stiffnessVals));
+% mCRY_avg = zeros(size(stiffnessVals));
+% mBMAL1_avg = zeros(size(stiffnessVals));
 figure
 hold on
 for i = 1:length(stiffnessVals)
-    [T,Y] = MechanoCircadianModel_full(tRange,[],[],stiffnessVals(i),couplingSol);
+    inhibVec = [1,1,1,1,0];
+    stiffnessVec = [stiffnessVals(i),inf,0];
+    MRTFParam = [1, 3.82752594304687, 20.9581804455536, 0.366250664261199, 86.6114163570272, 0.184399999956306];
+    SSVar = MechanoSS(stiffnessVec, inhibVec, MRTFParam);
+    [T,Y] = CircadianOnly_full(tRange, circad_param, SSVar([15,26]));
     [pks,locs] = findpeaks(Y(:,oscVarIdx),'MinPeakProminence',.01*1e-3);
     [troughs,troughLocs] = findpeaks(-Y(:,oscVarIdx),'MinPeakProminence',.01*1e-3);
-    mPER_avg(i) = trapz(T,Y(:,17))/range(T);
-    mCRY_avg(i) = trapz(T,Y(:,39))/range(T);
-    mBMAL1_avg(i) = trapz(T,Y(:,12))/range(T);
+    % mPER_avg(i) = trapz(T,Y(:,17))/range(T);
+    % mCRY_avg(i) = trapz(T,Y(:,39))/range(T);
+    % mBMAL1_avg(i) = trapz(T,Y(:,12))/range(T);
     if length(pks)>4
         period(i) = mean(diff(T(locs)));
         ampl(i) = mean(pks)-mean(-troughs);
@@ -71,8 +81,7 @@ for i = 1:length(stiffnessVals)
     plot(T/3600, Y(:,oscVarIdx))
 end
 
-function obj = pToObj_FullCoupling(couplingParam)
-    couplingParam = reshape(couplingParam,[4,2])';
+function obj = pToObj_FullCoupling(circad_param)
     maxTime = 3600*500;
     stiffnessTests = [1e4, 300, 19];
     periodVec1 = 3600*[23.8, 24.6, 25.6];
@@ -84,13 +93,17 @@ function obj = pToObj_FullCoupling(couplingParam)
     periodTest = zeros(size(periodVec1));
     amplTest = zeros(size(amplVec1));
     for i = 1:length(stiffnessTests)
-        [t,y] = MechanoCircadianModel_full([0 maxTime], [], [], stiffnessTests(i), couplingParam);
+        inhibVec = [1,1,1,1,0];
+        stiffnessVec = [stiffnessTests(i),inf,0];
+        MRTFParam = [1, 3.82752594304687, 20.9581804455536, 0.366250664261199, 86.6114163570272, 0.184399999956306];
+        SSVar = MechanoSS(stiffnessVec, inhibVec, MRTFParam);
+        [t,y] = CircadianOnly_full([0 maxTime], circad_param, SSVar([15,26]));
         if any(~isreal(y))
             obj = 1e6;
             return
         end
-        [pks,locs] = findpeaks(y(:,42),'MinPeakProminence',.01*1e-3);
-        [troughs,~] = findpeaks(-y(:,42),'MinPeakProminence',.01*1e-3);
+        [pks,locs] = findpeaks(y(:,18),'MinPeakProminence',.01*1e-3);
+        [troughs,~] = findpeaks(-y(:,18),'MinPeakProminence',.01*1e-3);
         if length(pks)>10 && length(troughs)>10
             lastExtremum = min([length(pks),length(troughs)]); 
             amplitudeStored = pks(2:lastExtremum) - (-troughs(2:lastExtremum));

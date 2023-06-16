@@ -1,6 +1,6 @@
 %% Test mechano-Circadian model under different conditions
-stiffnessVals = logspace(-1,3,50);
-inhibMag = 0:.1:10;
+stiffnessVals = [18,300,10000];%logspace(-1,3,20);
+inhibMag = 0;%0:.1:10;
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
 inhibMag = inhibMesh(:);
@@ -23,14 +23,14 @@ colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plots
 for i = 1:length(stiffnessVals)
 %     coupleParam(1,1) = ratioVals(i)*.5/3600;
 %     coupleParam(2,1) = (1-ratioVals(i))*.5/3600;
-    paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
-    % paramList = pSol;
+    % paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
+    paramList = pSol;
     actinInhib =  1;%1 / (1 + (inhibMag(i)/paramList(18)));
     ROCKInhib = 1;% / (1 + (inhibMag(i)/2));
     MRTFInhib = 1;%inhibMag(i);
     YAPInhib = 1;%inhibMag(i);
     cytoDConc = 0;%inhibMag(i);
-    LATSFactor = inhibMag(i);%7.5;
+    LATSFactor = 0;%inhibMag(i);%7.5;
     inhibVec = [actinInhib, ROCKInhib, MRTFInhib, YAPInhib, cytoDConc, LATSFactor]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)] 
     [T,Y, ySS] = MechanoCircadianModel([0 maxTime], [stiffnessVals(i),inf,inhibMag(i)], paramList, inhibVec, 0);%kraMult(i));
 %     yyaxis left
@@ -46,7 +46,7 @@ for i = 1:length(stiffnessVals)
 %     prettyGraph
     oscVarIdx = 2;
     if mod(i-1,1)==0
-        plot(T/(24*3600) - 1,Y(:,oscVarIdx),'LineWidth',2)%,'Color',colorSeries(i,:))
+        plot(T/(24*3600) - 3,Y(:,oscVarIdx),'LineWidth',2)%,'Color',colorSeries(i,:))
         xlim([0 5])
         ylabel('PER abundance')
         xlabel('Time (days)')
