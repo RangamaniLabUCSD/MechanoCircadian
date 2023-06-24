@@ -1,216 +1,77 @@
-%% testing delay differential equation
-tHistory = (-10:.1:0)';
-yHistory = zeros(size(tHistory));
-numSamples = 101;
+%% two variables
+% tauB1 = 8; pExpB = 2.5; KeB = 1;
+% KiB = .04; KdBP = 0.5; KdB = 0.4;
+% tauB2 = 8; pExpP = 2.5; KeP = 1;
+% KaP = .5; KdP = .4;
+% KeB2 = .1; KeP2 = .1;
+% p = [tauB1, pExpB, KeB, KiB, KdBP, KdB, tauB2, pExpP, KeP, KaP, KdP, KeB2, KeP2];
 
-pExp = 2.5;
-Ke = 1;
-tau = 8;
-Ki = .04;
-Kd = .4;
-Ke2 = .04;
-
-sampleVec = (1:numSamples)/(numSamples/5);
-tauVals = tau*ones(size(sampleVec));
-KeVals = Ke*ones(size(sampleVec));
-pExpVals = pExp*ones(size(sampleVec));
-KiVals = Ki*ones(size(sampleVec));
-KdVals = Kd*sampleVec;%ones(size(sampleVec));
-Ke2Vals = Ke2*ones(size(sampleVec));%sampleVec;
+p0 = [30112.1128026662/3600	2.49361433104013	0.00110195319176539*3600	0.0362906811897288	...
+        0.000138718472336416*3600	4.01740850738952e-05*3600	28800/3600	1.13993216317370	0.000138008691550797*3600	...
+        0.316725987150128	0.000225606126486809*3600	4.35158691215436e-05*3600    1.19993905179384e-05*3600]';
+p = p0;
+p(5) = 50;
 
 timeSpan = [0 120];
-yInit = 0;
-options = odeset('RelTol',1e-6,'NonNegative',1);%,'OutputFcn',@odeplot);
+KeB2Vals = 0:.05:1;
+KeP2Vals = 0:.04:.8;
+[KeB2Mat, KeP2Mat] = meshgrid(KeB2Vals, KeP2Vals);
+% KeB2Mat = .1; KeP2Mat = .1;
 
-figure
-hold on
-
-period = zeros(size(KeVals));
-amplitude = zeros(size(KeVals));
-for k = 1:length(KeVals)
-    tau = tauVals(k);
-    Ke = KeVals(k);
-    pExp = pExpVals(k);
-    Ki = KiVals(k);
-    Kd = KdVals(k);
-    Ke2 = Ke2Vals(k);
-    p = {tHistory,yHistory,tau,pExp,Ke,Ki,Kd,Ke2};
-
-    [tDDE,yDDE] = DDESolve(timeSpan,p);
-
-
-%     numChunks = ceil(range(timeSpan)/(tau/2));
-%     if ~isinf(numChunks)
-%         for i = 1:numChunks
-%             curChunk = [(i-1)*(tau/2) i*(tau/2)];
-%             [T,Y] = ode15s(@delayDiffEq,curChunk,yInit,options,p);
-%             p{1} = [p{1}; T(2:end)];
-%             p{2} = [p{2}; Y(2:end)];
-%             yInit = Y(end);
-%         end
-%         T = p{1};
-%         Y = p{2};
-%     else
-%         p{1} = nan;
-%         [T,Y] = ode15s(@delayDiffEq,timeSpan,yInit,options,p);
-%     end
-    if ~mod(k-1,2)
-%         plot(T,Y)
-        hold on
-        plot(tDDE-48, yDDE)
-    end
-    [pks,locs] = findpeaks(yDDE);
-    if ~isempty(pks)
-        period(k) = mean(diff(tDDE(locs(2:end))));
-        amplitude(k) = mean(pks(2:end))-min(yDDE(tDDE>48));
-    else
-        period(k) = nan;
-        amplitude(k) = nan;
-    end
-
-end
-
-%% analytical predictions
-xVals = 0:.01:200;
-% dxFake = 1./(1+xVals.^pExp) - b*xVals;
-% figure
-% plot(xVals,dxFake)
-F = @(x) Ke./(1+(x/Ki).^pExp) - Kd*x;
-xStar = fsolve(F,1);
-phi = pExp/((xStar/Ki)^(-pExp) + 1);
-omega = Kd*sqrt(phi^2 - 1);
-tauCalc = (1/omega) * acos(-(1/phi));
-
-periodVals = 2*pi*tauVals ./ (acos(-(1/phi)));
-
-%% SS x vals?
-bVals = (.1:.1:100)*.04*.4/1;
-xStarFig = figure;
-tauCritFig = figure;
-coupleVals = [0,.01,.05,.1,.2,.4,.8,1.6,3.2];
-
-for k = 1:length(coupleVals)
-    coupleValCur = coupleVals(k);
-    for i = 1:length(bVals)
-        bCur = bVals(i);
-        F = @(x) 1./(1+x.^pExp) - bCur*x + coupleValCur;
-        xStar(i) = fsolve(F,1);
-        phi = pExp*xStar(i)^(pExp-1)/((1+xStar(i)^(pExp))^2);
-        omega = sqrt(phi^2 - bCur^2);
-        tauCrit(i) = (1/omega) * acos(-bCur/phi);
-%         periodVals(i) = tauVals./omega;
-    end
-    figure(xStarFig)
-    semilogy(bVals,xStar)
-%     plot(bVals,pExp.*(bVals.*xStar - coupleValCur).^2 .* xStar.^(pExp-1) ./ bVals)
-    hold on
-    figure(tauCritFig)
-    loglog(bVals,tauCrit*.04)
-    hold on
-end
-
-%% Test dependence on coupleVal
-bVals = [.1,.3,1,3,10]*.04*.4/1;
-figure
-hold on
-for k = 1:length(bVals)
-coupleVals = 0:.01:1;
-bCur = bVals(k);%.04*.4/1;
-xStar = zeros(size(coupleVals));
-tauCr it = zeros(size(coupleVals));
-omega = zeros(size(coupleVals));
-for i = 1:length(coupleVals)
-    coupleValCur = coupleVals(i);
-    F = @(x) 1./(1+x.^pExp) - bCur*x + coupleValCur;
-    xStar(i) = fsolve(F,1);
-    phi = pExp*xStar(i)^(pExp-1)/((1+xStar(i)^(pExp))^2);
-    omega(i) = sqrt(phi^2 - bCur^2);
-    tauCrit(i) = (1/omega(i)) * acos(-bCur/phi);
-end
-plot(coupleVals, 2*pi*8./(tauCrit.*omega))
-end
-
-%% two variables
-tauB1 = 8;
-pExpB = 2.5;
-KeB = 1;
-KiB = .04;
-KdBP = 0;%0.5;
-% KdBPVals = KdBP * logspace(-1,1,10);
-KdB = 0.4;
-tauB2 = 8;
-pExpP = 2.5;
-KeP = 1;
-KaP = .5;
-KdP = .4;
-KdPVals = KdP;% * logspace(-1,1,10);
-KeB2 = .1;
-KeP2 = .1;
-
-p = {tauB1, pExpB, KeB, KiB, KdBP, KdB, tauB2, pExpP, KeP, KaP, KdP, KeB2, KeP2};
-% for i=1:length(p)
-%     p{i} = pSol(i);
-% end
-timeSpan = [0 1000];
-
-% periodFig = figure;
-% xlabel('Act')
-% hold on
-% amplitudeFig = figure;
-% xlabel('Act')
-% hold on
-
-weightParam = 0.5;%0:.1:1; 
-testVals = KeB2;
-period = zeros(size(testVals));
-amplitude = zeros(size(testVals));
-amplitudeRatio = zeros(size(testVals));
-phaseLag = zeros(size(testVals));
+period = zeros(size(KeB2Mat));
+amplitude = zeros(size(KeB2Mat));
+amplitudeRatio = zeros(size(KeB2Mat));
+phaseLag = zeros(size(KeB2Mat));
 timeFig = figure;
-for k = 1:length(weightParam)%length(KdPVals)
-%     p{11} = KdPVals(k);
-    PWeight = weightParam(k);
-    BWeight = (1-weightParam(k));
-    figure(timeFig)
-    for i = 1:length(testVals)
-        p{12} = .03;%testVals(i)*BWeight;
-        p{13} = testVals(i)*PWeight;
-%         p{13} = testVals(i);
-%         p{1} = testVals(i);
-        [t2,y2] = DDESolve2(timeSpan,p);
-%             if mod(i-1,10) == 0
-%                 plot(t2-48,y2(:,1))
-%                 hold on
-                plot(t2,y2(:,2))
-                hold on
-%                 yyaxis right
-                plot(t2,y2(:,1))
-                drawnow
-%                 pause(.5)
-%                 prettyGraph
-%                 xlim([0 96])
-%             end
-        expressionFunc = p{9}./(1+(p{10}./y2(:,1)).^p{8});
-        [pks,locs] = findpeaks(y2(:,2),'MinPeakProminence',.1);
-        [troughs,troughLocs] = findpeaks(-y2(:,2),'MinPeakProminence',.1);
-        [pks2,locs2] = findpeaks(y2(:,1),'MinPeakProminence',.1);
-        [troughs2,troughLocs2] = findpeaks(-y2(:,1),'MinPeakProminence',.1);
-        if ~isempty(pks)
-            period(i) = mean(diff(t2(locs(2:end))));
-            amplitude(i) = mean(pks(2:end)) - mean(-troughs(2:end));
-            amplitudeRatio(i) = amplitude(i)/(mean(pks2(2:end)) - mean(-troughs2(2:end)));
-            numPksTest = min([length(pks),length(pks2)]);
-            phaseLag(i) = 2*pi*mean(t2(locs(2:numPksTest))-mean(t2(locs2(2:numPksTest)))) / period(i);
+
+[numRows, numCols] = size(KeB2Mat);
+parfor i = 1:numRows
+    for j = 1:numCols
+        pCur = p;
+        figure(timeFig)
+        pCur(12) = KeB2Mat(i,j);
+        pCur(13) = KeP2Mat(i,j);
+        [t2,y2] = DDESolve2(timeSpan,pCur);
+        if any(isnan(y2(:,2)))
+            y2(:,2) = 0;
+        end
+        if any(~isreal(y2(:,2)))
+            y2(:,2) = real(y2(:,2));
+        end
+        if mod(i-1,5) == 0
+%             subplot(3,1,j)
+            plot(t2,y2(:,1),'LineWidth',1)
+            prettyGraph
+            xlabel('Time (hr)')
+            ylabel('P')
+            xlim([0 200])
+            hold on
+        end
+        expressionFunc = pCur(9)./(1+(pCur(10)./y2(:,1)).^pCur(8));
+        [pks,locs] = findpeaks(y2(:,2),'MinPeakProminence',.001);
+        [troughs,troughLocs] = findpeaks(-y2(:,2),'MinPeakProminence',.001);
+%         [pks2,locs2] = findpeaks(y2(:,1),'MinPeakProminence',.001);
+%         [troughs2,troughLocs2] = findpeaks(-y2(:,1),'MinPeakProminence',.001);
+        if length(pks)<=2 || length(troughs)<=2
+            period(i,j) = nan;
+            amplitude(i,j) = nan;
         else
-            period(i) = nan;
-            amplitude(i) = nan;
+            lastExtremum = min([length(pks),length(troughs)]); 
+            amplitudeStored = pks(2:lastExtremum) - (-troughs(2:lastExtremum));
+            if amplitudeStored(end) < 0.1*amplitudeStored(1) % cannot be decaying rapidly (not sustained osc)
+                period(i,j) = nan;
+                amplitude(i,j) = nan;
+            else
+                period(i,j) = mean(diff(t2(locs(2:end))));
+                amplitude(i,j) = mean(amplitudeStored);
+            end
         end
     end
-%     figure(periodFig)
-%     plot(testVals,period)
-%     figure(amplitudeFig)
-%     plot(testVals,amplitude)
 end
+figure
+surf(KeB2Mat, KeP2Mat, period, 'LineStyle','none','FaceColor','interp')
+daspect([.5 1 1])
+view([0 90])
 
 %% Parameter estimation for 2 DDE model
 p0 = [8; 2.5; 1; .04; 0.5; 0.4; 8; 2.5; 1; .5; .4; 0; 0];
@@ -646,58 +507,24 @@ function [x,xRed,omegaEst] = solve2Var(p)
     end
 end
 
-function dy = delayDiffEq(t,y,p)
-    tHistory = p{1};
-    yHistory = p{2};
-    tau = p{3};
-    pExp = p{4};
-    Ke = p{5};
-    Ki = p{6};
-    Kd = p{7};
-    if any(isnan(tHistory))
-        pastVal = y;
-    else
-        pastVal = interp1(tHistory,yHistory,t-tau);
-    end
-    dy = Ke/(1 + (pastVal/Ki)^pExp) - Kd*y;
-end
-
-function [t,y] = DDESolve(timeSpan,p)
-    tau = p{3};    
-    pExp = p{4};
-    Ke = p{5};
-    Ki = p{6};
-    Kd = p{7};
-    Ke2 = p{8};
-    DDESol = dde23(@ddefun, tau, @history, timeSpan, ddeset('MaxStep',.1));
-    t = DDESol.x;
-    y = DDESol.y;
-
-    function dy = ddefun(t,y,Z)
-        ylag = Z(:,1);
-        dy = Ke/(1 + (ylag(1)/Ki)^pExp) + Ke2 - Kd*y(1);
-    end
-
-    function s = history(t)
-        s = 0;
-    end
-end
-
 function [t,y] = DDESolve2(timeSpan,p)
-    tauB1 = p{1};    
-    pExpB = p{2};
-    KeB = p{3};
-    KiB = p{4};
-    KdBP = p{5};
-    KdB = p{6};
-    tauB2 = p{7};
-    pExpP = p{8};
-    KeP = p{9};
-    KaP = p{10};
-    KdP = p{11};
-    KeB2 = p{12};
-    KeP2 = p{13};
+    tauB1 = p(1);    
+    pExpB = p(2);
+    KeB = p(3);
+    KiB = p(4);
+    KdBP = p(5);
+    KdB = p(6);
+    tauB2 = p(7);
+    pExpP = p(8);
+    KeP = p(9);
+    KaP = p(10);
+    KdP = p(11);
+    KeB2 = p(12);
+    KeP2 = p(13);
 
+    ssVals = fsolve(@(ss) [KeB/(1+(ss(1)/KiB)^pExpB) + KeB2 - KdBP*ss(1)*ss(2) - KdB*ss(1);
+                           KeP/(1+(KaP/ss(1))^pExpP) + KeP2 - KdBP*ss(1)*ss(2) - KdP*ss(2)],...
+                [0.1,0.1]);
     DDESol = dde23(@ddefun, [tauB1,tauB2], @history, timeSpan, ddeset('MaxStep',.1));
     t = DDESol.x';
     y = DDESol.y';
@@ -709,11 +536,11 @@ function [t,y] = DDESolve2(timeSpan,p)
         P = y(2);
 %         KeB2Cur = KeB2 * (1 - t/timeSpan(2));
         dy = [KeB/(1+(BLag1/KiB)^pExpB) + KeB2 - KdBP*B*P - KdB*B;
-              KeP/(1+(KaP/BLag2)^pExpP) + KeP2 - KdBP*B*P - KdP*P];
+              KeP/(1+(KaP/BLag1)^pExpP) + KeP2 - KdBP*B*P - KdP*P];
     end
     
     function s = history(t)
-        s = zeros(2,1);
+        s = [5*ssVals(1); 0.2*ssVals(2)];
     end
 end
 

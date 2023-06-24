@@ -1,25 +1,34 @@
 bifFig = figure;
 hold on
-omegaFig = figure;
-hold on
-omegaFig2 = figure;
-hold on
-stiffness = log(1e5);
-par = pSol;
+% omegaFig = figure;
+% hold on
+% omegaFig2 = figure;
+% hold on
+% stiffness = log(1e5);
+% tauB1 = 8; pExpB = 2.5; KeB = 1;
+% KiB = .04; KdBP = 0.5; KdB = 0.4;
+% tauB2 = 8; pExpP = 2.5; KeP = 1;
+% KaP = .5; KdP = .4;
+% KeB2 = .1; KeP2 = .1;
+% par = [tauB1*3600, pExpB, KeB/3600, KiB, KdBP/3600, KdB/3600,...
+%     tauB2*3600, pExpP, KeP/3600, KaP, KdP/3600, .1/3600, .1/3600];
+par = pSol([1:12, 15]);
 par(1) = par(1)/3600;
 par(20) = stiffness;
 funcs=set_funcs(...
     'sys_rhs', @circadian_rhs,...
     'sys_tau',@()[1]);%tau is the first parameter in the parameter vector,...
 %'sys_deri',@circadian_deri);
-% KeP2Vals = pSol(15);%*[0,.1,.2,.5,1,2,5,10];
-KdBPVals = pSol(5)*[.1,.2,.5,1,2];%,5,10];
-fracKeB2Init = [.5,1,.1,.1,.1];
+% KeP2Vals = pSol(13);%*[0,.1,.2,.5,1,2,5,10];
+% KdBPVals = par(5)*[0,.1,.2,.5,1,2,5,10,50,100,500,1000];%[0,.1,.2,.5,1,2,5,10];%,5,10];
+% KeB2Init = par(12)*[0,0,0,0,0,0,.5,1,2,2,2,2];%zeros(1,8);%[0,1,.1,.1,.1];
+KdBPVals = par(5)*100;%[0,1,10,100,1000];
+KeB2Init = par(12)*2;%[0,0,1,2,2];
 plotLogic = false;
 for i = 1:length(KdBPVals)
     par(5) = KdBPVals(i);
-    par(12) = fracKeB2Init(i)*par(12);
-%     par(15) = KeP2Vals(i);%.5;
+    par(12) = KeB2Init(i);
+%     par(13) = KeP2Vals(i);%.5;
     % compute ss
     stst.kind='stst';
     stst.parameter=par;
@@ -32,11 +41,15 @@ for i = 1:length(KdBPVals)
     stst.stability=p_stabil(funcs,stst,method.stability)
     figure; clf;
     p_splot(stst); % plot its stability
+    if ~plotLogic
+        close(gcf)
+    end
 
+    figure; clf;
     % continue along branch
     ind_stiffness = 20;
     ind_KeB2 = 12;
-    % get an empty branch with ind_stiffness as a free parameter:
+    % get an empty branch with ind_KeB2 as a free parameter:
     branch1=df_brnch(funcs,ind_KeB2,'stst')
     branch1.parameter
     branch1.parameter.min_bound
@@ -52,10 +65,10 @@ for i = 1:length(KdBPVals)
     branch1.point(2)=stst;
     % continue in one direction:
     [branch1,s,f,r]=br_contn(funcs,branch1,100)
-    % % turn the branch around:
-    % branch1=br_rvers(branch1);
-    % % continue in the other direction:
-    % [branch1,s,f,r]=br_contn(funcs,branch1,100)
+%     % turn the branch around:
+%     branch1=br_rvers(branch1);
+%     % continue in the other direction:
+%     [branch1,s,f,r]=br_contn(funcs,branch1,100)
 
     branch1.method.stability.minimal_real_part=-2;
     branch1=br_stabl(funcs,branch1,0,0);
@@ -101,7 +114,7 @@ for i = 1:length(KdBPVals)
     end
 
     % continue Hopf branch
-    ind_KeP2 = 15;
+    ind_KeP2 = 13;
     ind_KdBP = 5;
     branch2=df_brnch(funcs,[ind_KeB2,ind_KeP2],'hopf'); % use hopf point as first point of hopf branch:
     branch2.parameter.min_bound(1:2,:)=[[ind_KeB2 0]' [ind_KeP2 0]']';
@@ -118,11 +131,11 @@ for i = 1:length(KdBPVals)
     [hopf,success]=p_correc(funcs,hopf,ind_KeB2,[],method.point); % correct hopf point, recompute stability
     branch2.point(2)=hopf;                                 % use as second point of hopf branch:
     figure; clf;
-    [branch2,s,f,r]=br_contn(funcs,branch2,500);            % continue with plotting hopf branch:
+    [branch2,s,f,r]=br_contn(funcs,branch2,200);            % continue with plotting hopf branch:
     branch2=br_rvers(branch2);                             % reverse Hopf branch
-    [branch2,s,f,r]=br_contn(funcs,branch2,500);            % continue in other direction
+    [branch2,s,f,r]=br_contn(funcs,branch2,200);            % continue in other direction
 %     xlabel('KeB2');ylabel('KeP2');
-    xlabel('KeB2');ylabel('KdBP');
+    xlabel('KeB2');ylabel('KeP2');
     if ~plotLogic
         close(gcf)
     end
@@ -132,17 +145,17 @@ for i = 1:length(KdBPVals)
     omegaBranch = zeros(size(branch2.point));
     for j = 1:length(branch2.point)
 %         KdBPBranch(j) = branch2.point(j).parameter(5);
-        KeP2Branch(j) = branch2.point(j).parameter(15);
+        KeP2Branch(j) = branch2.point(j).parameter(13);
         KeB2Branch(j) = branch2.point(j).parameter(12);
         omegaBranch(j) = branch2.point(j).omega;
     end
     figure(bifFig)
 %     plot(KdBPBranch*3600,KeB2Branch*3600)
     plot(KeB2Branch*3600, KeP2Branch*3600)
-    figure(omegaFig)
-    plot(KeB2Branch*3600,2*pi./omegaBranch)
-    figure(omegaFig2)
-    plot(KeP2Branch*3600, 2*pi./omegaBranch)
+%     figure(omegaFig)
+%     plot(KeB2Branch*3600,2*pi./omegaBranch)
+%     figure(omegaFig2)
+%     plot(KeP2Branch*3600, 2*pi./omegaBranch)
 end
 
 %% continuation of periodic orbits
@@ -193,14 +206,8 @@ function y = circadian_rhs(xx,par)
     KeP = par(9)*3600;
     KaP = par(10);
     KdP = par(11)*3600;
-    KeB2Max = par(12)*3600;
-    K_YT = par(13);
-    nY = par(14);
-    KeP2Max = par(15)*3600;
-    K_MRTF = par(16);
-    nM = par(17);
-    KeB2 = KeB2Max;%*SSVar(15)^nY/(SSVar(15)^nY + K_YT^nY);
-    KeP2 = KeP2Max;%*SSVar(25)^nM/(SSVar(25)^nM + K_MRTF^nM);
+    KeB2 = par(12)*3600;
+    KeP2 = par(13)*3600;
     y = [KeB/(1+(BLag/KiB)^nB) + KeB2 - KdBP*B*P - KdB*B;
          KeP/(1+(KaP/BLag)^nP) + KeP2 - KdBP*B*P - KdP*P];
 end

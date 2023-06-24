@@ -1,5 +1,5 @@
 %% Test mechano-Circadian model under different conditions
-stiffnessVals = [18,300,10000];%logspace(-1,3,20);
+stiffnessVals = 100;%logspace(-1,3,20);
 inhibMag = 0;%0:.1:10;
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
@@ -24,7 +24,7 @@ for i = 1:length(stiffnessVals)
 %     coupleParam(1,1) = ratioVals(i)*.5/3600;
 %     coupleParam(2,1) = (1-ratioVals(i))*.5/3600;
     % paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
-    paramList = pSol;
+    paramList = p0;
     actinInhib =  1;%1 / (1 + (inhibMag(i)/paramList(18)));
     ROCKInhib = 1;% / (1 + (inhibMag(i)/2));
     MRTFInhib = 1;%inhibMag(i);
@@ -46,10 +46,16 @@ for i = 1:length(stiffnessVals)
 %     prettyGraph
     oscVarIdx = 2;
     if mod(i-1,1)==0
-        plot(T/(24*3600) - 3,Y(:,oscVarIdx),'LineWidth',2)%,'Color',colorSeries(i,:))
+        plot(T/(24*3600) - 10,Y(:,oscVarIdx),'LineWidth',2)%,'Color',colorSeries(i,:))
         xlim([0 5])
-        ylabel('PER abundance')
+        ylim([0 .5])
+        ylabel('PER/CRY abundance')
         xlabel('Time (days)')
+        yyaxis right
+        plot(T/(24*3600) - 10,Y(:,1),'LineWidth',2)
+        ylabel('BMAL1 abundance')
+        ylim([0 0.7])
+        legend('PER/CRY','BMAL1')
         prettyGraph
     end
     posTimeIdx = find(T>0);%T>48*3600);

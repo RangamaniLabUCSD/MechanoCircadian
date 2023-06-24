@@ -1,14 +1,35 @@
-%% run sims with diff stiffnesses
+%% Plot mechanotransduction dynamics
+maxTime = 3600*6;
+[T,Y] = MechanoOnlyModel([0 maxTime],[100,inf]);
+figure
+% subplot(1,2,1)
+hold on
+plot(T/60,Y(:,15)./(Y(:,17)+Y(:,18)),'LineWidth',1);
+plot(T/60,Y(:,26)./(Y(:,25)+Y(:,26)),'LineWidth',1);
+xlim([0 2*60])
+legend('YAP/TAZ','MRTF')
+ylabel('Nuclear to cytoplasmic ratio')
+xlabel('Time (minutes)')
+prettyGraph
+% subplot(1,2,2)
+% hold on
+% plot(T/60,Y(:,5)/Y(1,5),'LineWidth',1)
+% plot(T/60,Y(:,21)/Y(1,21),'LineWidth',1)
+% xlim([0 2*60])
+% legend('F-actin','Active myosin')
+% prettyGraph
+
+%% Test reduced YAP-TAZ system dynamics
 stiffnessVals = logspace(0,2,41);
 maxTime = 3600*120;
 tauVals = zeros([24,length(stiffnessVals)]);
 figure
 hold on
 for i = 1:length(stiffnessVals)
-    [T,Y,TRed,SSVarMat,tauValsCur] = MechanoOnlyModel([0 maxTime],[stiffnessVals(i),3600*240]);
+    [T,Y,TRed,SSVarMat,tauValsCur] = MechanoOnlyModel([0 maxTime],[stiffnessVals(i),inf]);
     tauVals(:,i) = tauValsCur;
     if ~mod(i-1,10)
-        plot(T/3600,Y(:,15)./(Y(:,17)+Y(:,18)));
+        plot(T/60,Y(:,15)./(Y(:,17)+Y(:,18)));
         plot(TRed/3600,SSVarMat(:,15)./(SSVarMat(:,17)+SSVarMat(:,18)),'--')
 %         plot(TRed/3600,(SSVals(15)/(SSVals(17)+SSVals(18)))*ones(size(TRed)),'--')
     end

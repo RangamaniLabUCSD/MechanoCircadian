@@ -1,4 +1,4 @@
-function [T,Y, SSVals] = YAPTAZClock_EAF(timeSpan, treatmentParam, paramList, inhibVec, popVar)
+function [T,Y, SSVals] = MechanoCircadianModel(timeSpan, treatmentParam, paramList, inhibVec, popVar)
 % [T,Y,yinit,param] = EAFTests_Scott_Fraley_Rangamani_YAP_TAZ_model_2021__2D_and_3D_simulations_(argTimeSpan,argYinit,argParam)
 %
 % input:
