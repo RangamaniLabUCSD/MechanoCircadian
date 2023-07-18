@@ -102,12 +102,15 @@ if saveVid
 end
 
 %% Fit MRTF
-MRTFParamInit = [1.5e6; 1; 10; 1; 100; 0.0461];
+MRTFParamInit = [1.5e6; 1; 10; 1; 100; 0.0461; 2; 0.1; 3.25];
 lowerLim = MRTFParamInit/10;
 upperLim = MRTFParamInit*10;
+lowerLim(9) = MRTFParamInit(9)/4;
+upperLim(9) = MRTFParamInit(9)*4;
 % lowerLim([1]) = MRTFParamInit([1]);
 % upperLim([1]) = MRTFParamInit([1]);
-options = optimoptions('particleswarm','UseParallel',true,'HybridFcn',@fmincon, 'FunctionTolerance', 1e-9);%, 'MaxTime', 60*20);
+options = optimoptions('particleswarm','UseParallel',false,'HybridFcn',@fmincon,...
+    'PlotFcn','pswplotbestf');%, 'FunctionTolerance', 1e-9);%, 'MaxTime', 60*20);
 pSolMRTF = particleswarm(@pToObj_MRTF, length(MRTFParamInit), lowerLim, upperLim, options);%p0);
 % pSolMRTF = lsqnonlin(@pToF_MRTF, MRTFParamInit, lowerLim, upperLim);
 pToObj_MRTF(pSolMRTF)
@@ -135,13 +138,65 @@ hold on
 semilogx(stiffnessVals,MRTFEq)
 hold on
 
+%% plot cytD cases
+cytDVals = 0:.1:12;
+MRTFEq = zeros(size(cytDVals));
+for i = 1:length(cytDVals)
+    inhibVec = [1,1,1,1, cytDVals(i)];
+    stiffnessVec = [1e7,inf,0];
+    SSVar = MechanoSS(stiffnessVec, inhibVec, pSolMRTF);
+    MRTFEq(i) = SSVar(25)/SSVar(26);
+end
+figure
+plot(cytDVals,MRTFEq)
+hold on
+
+%% plot jasp cases
+jaspVals = 0:.01:1.5;
+MRTFEq = zeros(size(jaspVals));
+for i = 1:length(jaspVals)
+    actinPolyFactor = 1 + pSolMRTF(7)*jaspVals(i)/(pSolMRTF(8) + jaspVals(i));
+    inhibVec = [actinPolyFactor,1,1,1, 0];
+    stiffnessVec = [1e7,inf,0];
+    SSVar = MechanoSS(stiffnessVec, inhibVec, pSolMRTF);
+    MRTFEq(i) = SSVar(25)/SSVar(26);
+end
+figure
+plot(jaspVals,MRTFEq)
+hold on
+
 function obj = pToObj_MRTF(p)
-    stiffnessTests = [1, 1, 1e5, 1e5];
-    cytDTests = [0, 2.5, 0, 2.5];
-    MRTFEqData = [0.5, 0.8, 1, 4];
+    stiffnessTests = [1e7; 1e7; 1e7; 0.175; 0.175; 0.175;...
+        0.3; 20; 1e7;... 
+        6.573705179; 15.79681275; 25.47144754; 34.58167331;...
+        5; 100;...
+        1.530002883; 13.77000253; 1.394647827; 14.82309684;...
+        1e7; 1e7;...
+        3; 40;...
+        1e7; 1; 6; 50; 1e7; 1; 6; 50;...
+        30; 30; 30; 0.3];
+    cytDTests = zeros(35,1);
+    cytDTests([3,6]) = 2.5;
+    cytDTests(21) = 10;
+    cytDTests(34) = 1;
+    jaspTests = zeros(35,1);
+    jaspTests([2,5]) = 0.5;
+    jaspTests(33) = 1;
+    MRTFEqData = [0.846153846; 6.692307692; 4.230769231; 0.615384615; 1.692307692;...
+        0.923076923; 0.372093023; 2.511627907; 8; 1.651785714; 1.95610119; 1.943948413;...
+        1.680272109; 1.923076923; 3.461538462; 1.201970443; 1.596059113; 1.448275862;...
+        1.280788177; 5.68852459; 6.776818742; 0.64921466; 0.670157068; 2.798722045;...
+        1.840255591; 1.878594249; 3.872204473; 2.485436893; 1.009708738; 1.048543689;...
+        2.097087379; 1.345730564; 1.282941831; 1.254349864; 0.905891002];
+    stiffnessTests = stiffnessTests([1:21,24:end]);
+    cytDTests = cytDTests([1:21,24:end]);
+    jaspTests = jaspTests([1:21,24:end]);
+    MRTFEqData = MRTFEqData([1:21,24:end]);
+
     MRTFEqTest = zeros(size(MRTFEqData));
     for i = 1:length(cytDTests)
-        inhibVec = [1,1,1,1, cytDTests(i)];
+        actinPolyFactor = 1 + p(7)*jaspTests(i)/(p(8) + jaspTests(i));
+        inhibVec = [actinPolyFactor,1,1,1, cytDTests(i)];
         stiffnessVec = [stiffnessTests(i),inf,0];
         SSVar = MechanoSS(stiffnessVec, inhibVec, p);
         MRTFEqTest(i) = SSVar(25)/SSVar(26);

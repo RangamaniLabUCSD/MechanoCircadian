@@ -12,22 +12,27 @@ hold on
 % KeB2 = .1; KeP2 = .1;
 % par = [tauB1*3600, pExpB, KeB/3600, KiB, KdBP/3600, KdB/3600,...
 %     tauB2*3600, pExpP, KeP/3600, KaP, KdP/3600, .1/3600, .1/3600];
-par = pSol([1:12, 15]);
+par = pSol;
+par(29:30) = [2,0.1];
+% par(12) = pSol(12) + pSol(23);
+% par(13) = pSol(15) + pSol(20);
 par(1) = par(1)/3600;
-par(20) = stiffness;
+par(7) = par(7)/3600;
+% par(20) = stiffness;
 funcs=set_funcs(...
     'sys_rhs', @circadian_rhs,...
-    'sys_tau',@()[1]);%tau is the first parameter in the parameter vector,...
+    'sys_tau',@()[1,7]);%tau is the first parameter in the parameter vector,...
 %'sys_deri',@circadian_deri);
 % KeP2Vals = pSol(13);%*[0,.1,.2,.5,1,2,5,10];
 % KdBPVals = par(5)*[0,.1,.2,.5,1,2,5,10,50,100,500,1000];%[0,.1,.2,.5,1,2,5,10];%,5,10];
 % KeB2Init = par(12)*[0,0,0,0,0,0,.5,1,2,2,2,2];%zeros(1,8);%[0,1,.1,.1,.1];
-KdBPVals = par(5)*100;%[0,1,10,100,1000];
-KeB2Init = par(12)*2;%[0,0,1,2,2];
+KdBPVals = par(5)*[0,.1,1,10];%[0,1,10,100,1000];
+YInit = par(29)*[.5,.7,1,3];
+% KeB2Init = par(12)*[0,0,.2,1.5];%[0,0,1,2,2];
 plotLogic = false;
-for i = 1:length(KdBPVals)
+for i = 1:1%length(KdBPVals)
     par(5) = KdBPVals(i);
-    par(12) = KeB2Init(i);
+    par(29) = YInit(i);
 %     par(13) = KeP2Vals(i);%.5;
     % compute ss
     stst.kind='stst';
@@ -35,10 +40,10 @@ for i = 1:length(KdBPVals)
     stst.x = [0.1; 2];
     flag_newhheur=1; % flag_newhheur=1 is the default choice if this argument is omitted
     method=df_mthod(funcs,'stst',flag_newhheur);
-    method.stability.minimal_real_part=-1
-    [stst,success]=p_correc(funcs,stst,[],[],method.point)
+    method.stability.minimal_real_part=-1;
+    [stst,success]=p_correc(funcs,stst,[],[],method.point);
     % compute its stability:
-    stst.stability=p_stabil(funcs,stst,method.stability)
+    stst.stability=p_stabil(funcs,stst,method.stability);
     figure; clf;
     p_splot(stst); % plot its stability
     if ~plotLogic
@@ -48,27 +53,31 @@ for i = 1:length(KdBPVals)
     figure; clf;
     % continue along branch
     ind_stiffness = 20;
-    ind_KeB2 = 12;
+%     ind_KeB2 = 12;
+%     ind_KeP2 = 13;
+    ind_Y = 29;
+%     ind_M = 30;
     % get an empty branch with ind_KeB2 as a free parameter:
-    branch1=df_brnch(funcs,ind_KeB2,'stst')
+    branch1=df_brnch(funcs,ind_Y,'stst')
     branch1.parameter
     branch1.parameter.min_bound
     % set bounds for continuation parameter
-    branch1.parameter.min_bound(1,:)=[ind_KeB2 0];
-    branch1.parameter.max_bound(1,:)=[ind_KeB2 .2e-3];
-    branch1.parameter.max_step(1,:)=[ind_KeB2 1e-7];
+    branch1.parameter.min_bound(1,:)=[ind_Y 0];
+    branch1.parameter.max_bound(1,:)=[ind_Y 50];
+    branch1.parameter.max_step(1,:)=[ind_Y .02];
     % use stst as a first branch point:
     branch1.point=stst;
-    stst.parameter(ind_KeB2)=stst.parameter(ind_KeB2)+1e-5;
+    stst.parameter(ind_Y)=stst.parameter(ind_Y)+.02;
+%     stst.parameter(ind_KeP2)=stst.parameter(ind_KeP2)+1e-5;
     [stst,success]=p_correc(funcs,stst,[],[],method.point)
     % use as a second branch point:
     branch1.point(2)=stst;
     % continue in one direction:
-    [branch1,s,f,r]=br_contn(funcs,branch1,100)
+    [branch1,s,f,r]=br_contn(funcs,branch1,200)
 %     % turn the branch around:
 %     branch1=br_rvers(branch1);
 %     % continue in the other direction:
-%     [branch1,s,f,r]=br_contn(funcs,branch1,100)
+%     [branch1,s,f,r]=br_contn(funcs,branch1,200)
 
     branch1.method.stability.minimal_real_part=-2;
     branch1=br_stabl(funcs,branch1,0,0);
@@ -84,7 +93,7 @@ for i = 1:length(KdBPVals)
     br_plot(branch1,xm,ym,'c');
     % plot([0 5],[0 0],'-.');
     % axis([0 5 -2 1.5]);
-    xlabel('KeB2');ylabel('\Re\lambda');
+    xlabel('Y');ylabel('\Re\lambda');
     if ~plotLogic
         close(gcf)
     end
@@ -104,7 +113,7 @@ for i = 1:length(KdBPVals)
     hopf=p_tohopf(funcs,branch1.point(ind_hopf));
     method=df_mthod(funcs,'hopf',flag_newhheur); % get hopf calculation method parameters:
     method.stability.minimal_real_part=-1;
-    [hopf,success]=p_correc(funcs,hopf,ind_KeB2,[],method.point) % correct hopf
+    [hopf,success]=p_correc(funcs,hopf,ind_Y,[],method.point) % correct hopf
     first_hopf=hopf;                    % store hopf point in other variable for later use
     hopf.stability=p_stabil(funcs,hopf,method.stability); % compute stability of hopf point
     figure; clf;
@@ -114,44 +123,44 @@ for i = 1:length(KdBPVals)
     end
 
     % continue Hopf branch
-    ind_KeP2 = 13;
-    ind_KdBP = 5;
-    branch2=df_brnch(funcs,[ind_KeB2,ind_KeP2],'hopf'); % use hopf point as first point of hopf branch:
-    branch2.parameter.min_bound(1:2,:)=[[ind_KeB2 0]' [ind_KeP2 0]']';
-    branch2.parameter.max_bound(1:2,:)=[[ind_KeB2 1e-3]' [ind_KeP2 1e-3]']';
-    branch2.parameter.max_step(1:2,:)=[[ind_KeB2 1e-6]' [ind_KeP2 1e-6]']';
+    ind_Y = 29;
+    ind_M = 30;
+    branch2=df_brnch(funcs,[ind_Y,ind_M],'hopf'); % use hopf point as first point of hopf branch:
+    branch2.parameter.min_bound(1:2,:)=[[ind_Y 0]' [ind_M 0]']';
+    branch2.parameter.max_bound(1:2,:)=[[ind_Y 50]' [ind_M 50]']';
+    branch2.parameter.max_step(1:2,:)=[[ind_Y .005]' [ind_M .005]']';
 %     branch2=df_brnch(funcs,[ind_KeB2,ind_KdBP],'hopf'); % use hopf point as first point of hopf branch:
 %     branch2.parameter.min_bound(1:2,:)=[[ind_KeB2 0]' [ind_KdBP 0]']';
 %     branch2.parameter.max_bound(1:2,:)=[[ind_KeB2 1e-3]' [ind_KdBP 1e-3]']';
 %     branch2.parameter.max_step(1:2,:)=[[ind_KeB2 1e-6]' [ind_KdBP 1e-6]']';
     branch2.point=hopf;
 
-    hopf.parameter(ind_KeP2)=hopf.parameter(ind_KeP2)+.5e-5; % perturb hopf point
+    hopf.parameter(ind_Y)=hopf.parameter(ind_Y)+5e-4; % perturb hopf point
 %     hopf.parameter(ind_KdBP)=hopf.parameter(ind_KdBP)+.5e-5; % perturb hopf point
-    [hopf,success]=p_correc(funcs,hopf,ind_KeB2,[],method.point); % correct hopf point, recompute stability
+    [hopf,success]=p_correc(funcs,hopf,ind_Y,[],method.point); % correct hopf point, recompute stability
     branch2.point(2)=hopf;                                 % use as second point of hopf branch:
     figure; clf;
-    [branch2,s,f,r]=br_contn(funcs,branch2,200);            % continue with plotting hopf branch:
+    [branch2,s,f,r]=br_contn(funcs,branch2,2000);            % continue with plotting hopf branch:
     branch2=br_rvers(branch2);                             % reverse Hopf branch
-    [branch2,s,f,r]=br_contn(funcs,branch2,200);            % continue in other direction
+    [branch2,s,f,r]=br_contn(funcs,branch2,2000);            % continue in other direction
 %     xlabel('KeB2');ylabel('KeP2');
-    xlabel('KeB2');ylabel('KeP2');
+    xlabel('Y');ylabel('M');
     if ~plotLogic
         close(gcf)
     end
     KdBPBranch = zeros(size(branch2.point));
-    KeB2Branch = zeros(size(branch2.point));
-    KeP2Branch = zeros(size(branch2.point));
+    YBranch = zeros(size(branch2.point));
+    MBranch = zeros(size(branch2.point));
     omegaBranch = zeros(size(branch2.point));
     for j = 1:length(branch2.point)
 %         KdBPBranch(j) = branch2.point(j).parameter(5);
-        KeP2Branch(j) = branch2.point(j).parameter(13);
-        KeB2Branch(j) = branch2.point(j).parameter(12);
+        YBranch(j) = branch2.point(j).parameter(29);
+        MBranch(j) = branch2.point(j).parameter(30);
         omegaBranch(j) = branch2.point(j).omega;
     end
     figure(bifFig)
 %     plot(KdBPBranch*3600,KeB2Branch*3600)
-    plot(KeB2Branch*3600, KeP2Branch*3600)
+    plot(YBranch, MBranch)
 %     figure(omegaFig)
 %     plot(KeB2Branch*3600,2*pi./omegaBranch)
 %     figure(omegaFig2)
@@ -190,8 +199,8 @@ figure
 br_plot(branch4,xm,ym,'b');% look at the period along the branch:
 
 function y = circadian_rhs(xx,par)
-    BLag = xx(1,2);
-%     PLag = xx(2,2);
+    BLag1 = xx(1,2);
+    BLag2 = xx(1,3);
     B = xx(1,1);
     P = xx(2,1);
 %     SSVar = MechanoSS([exp(par(20)),inf]);
@@ -206,8 +215,10 @@ function y = circadian_rhs(xx,par)
     KeP = par(9)*3600;
     KaP = par(10);
     KdP = par(11)*3600;
-    KeB2 = par(12)*3600;
-    KeP2 = par(13)*3600;
-    y = [KeB/(1+(BLag/KiB)^nB) + KeB2 - KdBP*B*P - KdB*B;
-         KeP/(1+(KaP/BLag)^nP) + KeP2 - KdBP*B*P - KdP*P];
+    Y = par(29);
+    M = par(30);
+    KeB2 = 3600*(par(12)*Y^2/(par(13)^2+Y^2) + par(23)*M^2/(par(24)^2+M^2));
+    KeP2 = 3600*(par(15)*M^2/(par(16)^2+M^2) + par(20)*Y^2/(par(21)^2+Y^2));
+    y = [KeB/(1+(BLag1/KiB)^nB) + KeB2 - KdBP*B*P - KdB*B;
+         KeP/(1+(KaP/BLag2)^nP) + KeP2 - KdBP*B*P - KdP*P];
 end

@@ -77,7 +77,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         0.0;		% param(75) is 'Kr_r7'
         0.0;		% param(76) is 'Kr_r6'
         0.0;		% param(77) is 'Kr_r5'
-        10;%3.25;		% param(78) is 'C'
+        MRTFParam(9);%3.25;		% param(78) is 'C'
         0.0;		% param(79) is 'Kr_r4'
         0.0;		% param(80) is 'Kr_r3'
         0.0;		% param(81) is 'Kr_r2'

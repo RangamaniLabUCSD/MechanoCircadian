@@ -1,16 +1,18 @@
 %% Test mechano-Circadian model under different conditions
-stiffnessVals = 100;%logspace(-1,3,20);
-inhibMag = 0;%0:.1:10;
+stiffnessVals = logspace(-1,3,20);
+inhibMag = 0;%0:.02:1;%0:.05:5;
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
 inhibMag = inhibMesh(:);
+jaspConc = inhibMag;
 
 % kraMult = logspace(-1,0.5,50);
-maxTime = 3600*2000;
+maxTime = 3600*480;
 coupleParam = [0.05/3600, 1.5, 2;
                0.05/3600, 1.5, 2]; % Hill function parameters for YAP-TAZ -> xClock [magn, Kd, n]
 period = zeros(size(stiffnessVals));
 amplitude = zeros(size(stiffnessVals));
+oscDecayRate = zeros(size(stiffnessVals));
 YAPTAZEq = zeros(size(stiffnessVals));
 MRTFEq = zeros(size(stiffnessVals));
 FcytoEq = zeros(size(stiffnessVals));
@@ -20,60 +22,46 @@ hold on
 colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plots
 % colorSeries = [0,0,0; 0,.25,.66; .57,.75,.98];
 % colorSeries = colororder;
+noiseLevel = [0,0];%[.5e-4, .5e-4];
+
 for i = 1:length(stiffnessVals)
 %     coupleParam(1,1) = ratioVals(i)*.5/3600;
 %     coupleParam(2,1) = (1-ratioVals(i))*.5/3600;
     % paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
-    paramList = p0;
-    actinInhib =  1;%1 / (1 + (inhibMag(i)/paramList(18)));
+    paramList = pSol;
+    actinInhib = 1 + pSol(27)*jaspConc(i)/(pSol(28) + jaspConc(i));%1 / (1 + (inhibMag(i)/paramList(18)));
     ROCKInhib = 1;% / (1 + (inhibMag(i)/2));
     MRTFInhib = 1;%inhibMag(i);
     YAPInhib = 1;%inhibMag(i);
     cytoDConc = 0;%inhibMag(i);
-    LATSFactor = 0;%inhibMag(i);%7.5;
+    LATSFactor = 1;%inhibMag(i);%7.5;
     inhibVec = [actinInhib, ROCKInhib, MRTFInhib, YAPInhib, cytoDConc, LATSFactor]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)] 
-    [T,Y, ySS] = MechanoCircadianModel([0 maxTime], [stiffnessVals(i),inf,inhibMag(i)], paramList, inhibVec, 0);%kraMult(i));
-%     yyaxis left
-%     plot(T/3600 - 48,Y(:,5),'-','LineWidth',1)
-%     ylabel('PER protein')
-%     hold on
-%     xlabel('Time [h]')
-% %     yyaxis right
-%     plot(T/3600 - 48,Y(:,4),'-')
-% %     ylabel('BMAL1 protein')
-% %     hold on
-%     xlim([0 96])
-%     prettyGraph
+%     [T,Y, ySS] = MechanoCircadianModel([0 maxTime], [stiffnessVals(i),inf,inhibMag(i)], paramList, inhibVec, 0);%kraMult(i));
+    [period(i), amplitude(i), ~, ~, rawOutput,oscDecayRate(i)] = conditionToOutputs(pSol,stiffnessVals(i),inhibVec,maxTime,0,noiseLevel);
+    T = rawOutput{1};
+    Y = rawOutput{2};
+    ySS = rawOutput{3};
     oscVarIdx = 2;
     if mod(i-1,1)==0
-        plot(T/(24*3600) - 10,Y(:,oscVarIdx),'LineWidth',2)%,'Color',colorSeries(i,:))
+        % plot(T/(24*3600),Y(:,oscVarIdx),'LineWidth',0.5,'LineStyle','-','Marker','none')%,'Color',colorSeries(i,:))
+        oscDynamics = Y(:,3);%3600*pSol(9)./(1 + (pSol(10)./Y(:,1)).^pSol(8));
+        plot(T/(24*3600),oscDynamics,'LineWidth',0.5,'LineStyle','-','Marker','none')%,'Color',colorSeries(i,:))
         xlim([0 5])
-        ylim([0 .5])
+%         ylim([0 .5])
         ylabel('PER/CRY abundance')
         xlabel('Time (days)')
-        yyaxis right
-        plot(T/(24*3600) - 10,Y(:,1),'LineWidth',2)
-        ylabel('BMAL1 abundance')
-        ylim([0 0.7])
-        legend('PER/CRY','BMAL1')
-        prettyGraph
+%         yyaxis right
+%         plot(T/(24*3600) - 10,Y(:,1),'LineWidth',1,'LineStyle','-','Marker','none')
+%         ylabel('BMAL1 abundance')
+% %         ylim([0 0.7])
+%         legend('PER/CRY','BMAL1')
+%         prettyGraph
     end
-    posTimeIdx = find(T>0);%T>48*3600);
-    [pks,locs] = findpeaks(Y(posTimeIdx,oscVarIdx),'MinPeakProminence',.01);
-    [troughs,troughLocs] = findpeaks(-Y(posTimeIdx,oscVarIdx),'MinPeakProminence',.01);
     eqTimeIdx = find(T>72*3600);
     YAPTAZEq(i) = ySS(15)/(ySS(17)+ySS(18));%mean(Y(eqTimeIdx,2));
     MRTFEq(i) = ySS(25)/ySS(26);%mean(Y(eqTimeIdx,3));
     FcytoEq(i) = ySS(5);
     GactinEq(i) = ySS(9);
-    if ~isempty(pks)
-        TShift = T(posTimeIdx);
-        period(i) = mean(diff(TShift(locs(2:end))));
-        amplitude(i) = mean(pks)-mean(-troughs);
-    else
-        period(i) = nan;
-        amplitude(i) = nan;
-    end
 end
 % figure
 % surf(log10(stiffnessMesh),inhibMesh,reshape(period,size(stiffnessMesh)))
@@ -86,155 +74,247 @@ end
 % for i = 1:length(period)
 %     b.CData(i,:) = colorSeries(i,:);
 % end
+%% CytD validation
+FibroblastCytDPeriod = [24.2103,    0.2060; % Control
+                        24.9957,    0.1803; % 1 uM CytD
+                        24.9700,    0.0258; % 2 uM CytD
+                        24.6352,    0.3991];% 5 uM CytD
+FibroblastCytDAmpl = [1.0000,    0.1954; % Control
+                      1.2874,    0.1494; % 1 uM CytD
+                      1.6552,    0.3218; % 2 uM CytD
+                      1.9425,    0.3908]; % 5 uM CytD
+
+CytDTests = 0:.2:10;
+CytDPeriod = zeros(size(CytDTests));
+CytDAmpl = zeros(size(CytDTests));
+for i = 1:length(CytDTests)
+    inhibVec = [1, 1, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytoDConc] 
+    [CytDPeriod(i), CytDAmpl(i)] = conditionToOutputs(pSol, 1e7, inhibVec, 480*3600);
+end
+figure
+% subplot(1,2,1)
+plot(CytDTests, CytDPeriod/3600, 'LineWidth', 1)
+hold on
+CytDConc = [0, 1, 2, 5];
+errorbar(CytDConc, FibroblastCytDPeriod(:,1),...
+    FibroblastCytDPeriod(:,2), FibroblastCytDPeriod(:,2),...
+    'LineStyle','none','LineWidth',1,'Marker','s')
+xlim([0 6])
+% subplot(1,2,2)
+% plot(CytDTests, CytDAmpl/CytDAmpl(1), 'LineWidth', 1)
+% hold on
+% errorbar(CytDConc, FibroblastCytDAmpl(:,1),...
+%     FibroblastCytDAmpl(:,2), FibroblastCytDAmpl(:,2),...
+%     'LineStyle','none','LineWidth',1,'Marker','s')
+% xlim([0 6])
+
+%% LatB validation
+FibroblastLatBPeriod = [24.9389,    0.1048;
+                        25.4105,    0.1921;
+                        25.9694,    0.2620];
+FibroblastLatBAmpl = [1.0000,    0.0235;
+                      1.6118,    0.1412;
+                      2.3765,    0.0588];
+LatBTests = 0:.1:4;
+LatBPeriod = zeros(size(LatBTests));
+LatBAmpl = zeros(size(LatBTests));
+for i = 1:length(LatBTests)
+    inhibVec = [1/(1 + LatBTests(i)/0.5), 1, 1, 1, 0]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytoDConc] 
+    [LatBPeriod(i), LatBAmpl(i)] = conditionToOutputs(pSol, 1e7, inhibVec, 480*3600);
+end
+figure
+% subplot(1,2,1)
+plot(LatBTests, LatBPeriod/3600, 'LineWidth', 1)
+hold on
+LatBConc = [0, 1, 2];
+errorbar(LatBConc, FibroblastLatBPeriod(:,1),...
+    FibroblastLatBPeriod(:,2), FibroblastLatBPeriod(:,2),...
+    'LineStyle','none','LineWidth',1,'Marker','s')
+xlim([0 6])
+% subplot(1,2lim(,2)
+% plot(LatBTests, LatBAmpl/LatBAmpl(1), 'LineWidth', 1)
+% hold on
+% errorbar(LatBConc, FibroblastLatBAmpl(:,1),...
+%     FibroblastLatBAmpl(:,2), FibroblastLatBAmpl(:,2),...
+%     'LineStyle','none','LineWidth',1,'Marker','s')
+% xlim([0 6])
 
 %% generate population
 % lower YAPTAZ in nucleus: 1.25 uM
 % higher YAPTAZ in nucleus: 2 uM
-fixedParam = [2, 8, 14, 17]; % don't allow exponents to vary
-popVar = 0.2;
-varVec = popVar*ones(20,1);
-varVec(fixedParam) = 0;
-numCells = 200;
-figure
-hold on
-maxTime = 3600*1000;
-tInterp = 0:960;
-oscStored = zeros(numCells,length(tInterp));
-YAPTAZStored = zeros(numCells,1);
-MRTFStored = zeros(numCells,1);
-oscVarIdx = 1; % look at BMAL1 here
-for i = 1:numCells
-    varVecCur = varVec.*randn(size(varVec));
-    pCur = pSol' .* exp(varVecCur(1:19));
-    inhibVec = ones(1,4); %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)]
-    inhibVec(4) = 1;%0.1; %10% phosphorylation
-    inhibVec(5) = 0; % 0 cytD
-    inhibVec(6) = 1; %high density LATS factor=7.5, low density=1
-    stiffness = 1;
-    [T,Y, ySS] = MechanoCircadianModel([0 maxTime], [stiffness,inf,0], pCur, inhibVec, popVar);
-    plot(T/3600 - 48, Y(:,oscVarIdx))
-    oscStored(i,:) = interp1(T/3600, Y(:,oscVarIdx), tInterp);
-    YAPTAZStored(i) = ySS(15);
-    MRTFStored(i) = ySS(25);
-end
+stiffnessVals = [1e7,1e7,1e7];%[30, 0.3, 30, 30, 30, 30, 30, 30, 30];%logspace(-1,4,20);
+cytDConc = [0,0,0];%[0, 0, 1, 0, 0, 0, 0, 0, 0];
+latAConc = [0,1,2];%[0, 0, 0, 0.2, 0, 0, 0, 0, 0];
+LATSFactor = [1, 1, 1, 1, 7.5, 1, 1, 1, 1]; % 1 is low density, 7.5 for high density
+blebbiConc = [0, 0, 0, 0, 0, 10, 0, 0, 0];
+jaspConc = [0, 0, 0, 0, 0, 0, 1, 0, 0];
+contactArea = [2000,2000,2000,2000];%[2000, 500, 2000, 500, 1200, 2000, 1000, 1600, 900];
 
-% compute reference period for zero variance
-[T,Y, ySS] = MechanoCircadianModel([0 maxTime], [1e5,inf,0], pSol, inhibVec, 0);
-posTimeIdx = find(T>0);
-[pks,locs] = findpeaks(Y(posTimeIdx,oscVarIdx),'MinPeakProminence',.01);
-TShift = T(posTimeIdx);
-refPeriod = mean(diff(TShift(locs)));
-
-%% "Circadian power fraction"
-% maxTime = 500*3600;
-% [T,Y] = MechanoCircadianModel([0 maxTime], [100,inf,0], pSol);%kraMult(i));
-tInterp = 48*3600:3600:960*3600;
-figure
-hold on
-Fs = 1/3600;
-N = size(oscStored, 2);
-allPower = zeros(size(oscStored,1), length(0:Fs/N:Fs/2)); 
-for i = 1:size(oscStored,1)
-    % Fs = 1; % 1 hr sampling interval
-    % tInterp = 0:(1/Fs):maxTime;
-    % yInterp = interp1(tOsc,oscStored(i,:),tInterp);
-    yInterp = oscStored(i,48:end);
-%     hoursSmooth = 48;
-%     yWindow = smooth(yInterp, round(hoursSmooth*3600*Fs));
-    yWindow = mean(yInterp);
-    yInterp = yInterp' - yWindow;
-%     % eliminate edge effects
-%     keepLogic = tInterp > hoursSmooth*3600 & tInterp < (tInterp(end)-hoursSmooth*3600);
-%     tInterp = tInterp(keepLogic);
-%     yInterp = yInterp(keepLogic);
-    Y_fft = fft(yInterp);
-    Y_fft = Y_fft(1:floor(N/2+1));
-    curPower = (1/(Fs*N)) * abs(Y_fft).^2;
-    curPower(2:end-1) = 2*curPower(2:end-1);
-    freq = 0:Fs/N:Fs/2;
-    plot(freq*3600, curPower)
-    xlim([0 0.4])
-    allPower(i,:) = curPower;
-end
-avgPower = mean(allPower,1);
-plot(freq*3600,avgPower,'LineWidth',2)
-[~,maxIdx] = max(avgPower);
-peakFreq = 1/(refPeriod);%freq(maxIdx);
-powerFraction = zeros(size(allPower,1),1);
-for i = 1:size(allPower,1)
-    totPower = trapz(freq, allPower(i,:));
-    freqInterp = peakFreq - 0.2/(3600*24):0.001/(3600*24):peakFreq + 0.2/(3600*24);
-    powerInterp = interp1(freq, allPower(i,:), freqInterp);
-    powerFraction(i) = trapz(freqInterp, powerInterp) / totPower;
-end
-
-%% Fit YAPTAZ circadian model to stiffness data
-p0 = [8*3600; 2.5; 1/3600; .04; 0.5/3600; 0.4/3600; 8*3600; 2.5; 1/3600; .5; .4/3600;...
-    0.05/3600; 1; 2; .05/3600; 1; 2; 1; 3.25];
-lowerLim = p0/4;
-upperLim = p0*4;
-fixedParam = [2, 7, 8, 14, 17];
-for i = fixedParam
-    lowerLim(i) = p0(i);
-    upperLim(i) = p0(i);
-end
-expParam = [2,8,14,17]; 
-for i = expParam
-    if lowerLim(i)<1
-        lowerLim(i) = 1;
-    end
-end
-options = optimoptions('particleswarm','UseParallel',true,'HybridFcn',@fmincon);%, 'MaxTime', 60*20);
-pSol = particleswarm(@pToObj_CircadianClock, length(p0), lowerLim, upperLim, options);%p0);
-pToObj_CircadianClock(pSol)
-save('pSol_justPeriodWrongTrend_var4x.mat','pSol')
-
-
-function obj = pToObj_CircadianClock(p)
+popSeq = cell(size(stiffnessVals));
+meanPeriod = zeros(size(stiffnessVals));
+stdPeriod = zeros(size(stiffnessVals));
+percentOsc = zeros(size(stiffnessVals));
+% figure
+% hold on
+for k = 1:length(stiffnessVals)
+    fixedParam = [2, 8, 14, 17, 22]; % don't allow exponents to vary
+    popVar = 0.01; % started by testing 0.04 variance
+    varVec = sqrt(popVar)*ones(23,1);
+    varVec(fixedParam) = 0;
+    numCells = 1000;
     maxTime = 3600*1000;
-%     latruncTreatments = [0, 1, 2];%, 5];
-    cytoDTreatments = [0,1,2];
-    stiffnessTests = [1e4, 300, 19];
-%     periodVec = 3600*[24.9, 25.5, 26];%, 24.6];
-%     amplVec = [1, 2/1.2, 3/1.2];%, 3.3/1.2];
-%     periodVec = 3600*[24, 25, 25];%, 24.6];
-%     amplVec = [1, 1.6/1.2, 2/1.2];%, 2.3/1.2];
-    periodVec1 = 3600*[23.8, 24.6, 25.6];
-    periodVec2 = 3600*[23.8, 24, 24.8];
-    periodVec = (periodVec1 + periodVec2)/2;
-    amplVec1 = [1, 105/45, 85/45];
-    amplVec2 = [1, 145/80, 95/80];
-    amplVec = (amplVec1 + amplVec2) / 2;
-    periodTest = zeros(size(periodVec1));
-    amplTest = zeros(size(amplVec1));
-    for i = 1:length(stiffnessTests)
-%         actinPolymBlock =  1 / (1 + (latruncTreatments(i)/p(18)));
-        actinPolymBlock = 1;
-        inhibVec = [actinPolymBlock, 1, 1, 1, 0]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)] 
-        [t,y] = MechanoCircadianModel([0 maxTime], [stiffnessTests(i),inf,0], p, inhibVec, 0);
-        if any(~isreal(y))
-            obj = 1e6;
-            return
-        end
-        [pks,locs] = findpeaks(y(:,2),'MinPeakProminence',.01);
-        [troughs,~] = findpeaks(-y(:,2),'MinPeakProminence',.01);
-        if length(pks)>10 && length(troughs)>10
-            lastExtremum = min([length(pks),length(troughs)]); 
-            amplitudeStored = pks(2:lastExtremum) - (-troughs(2:lastExtremum));
-            amplTest(i) = mean(amplitudeStored);
-            if amplitudeStored(end) < 0.8*amplitudeStored(1) % cannot be decaying rapidly (not sustained osc)
-                periodTest(i) = t(end);
-            else
-                periodTest(i) = mean(diff(t(locs(2:end))));
-            end
-        else
-            periodTest(i) = t(end);
-            amplTest(i) = mean(y(:,2));
-        end
+    tInterp = 0:0.25:960;
+    Fs = 1/(15*60); % experimentally, measure every 15 minutes
+    N = length(tInterp); 
+    freq = 0:Fs/N:Fs/2;
+    oscStored = [];%zeros(numCells,length(tInterp));
+    allPower = zeros(numCells, floor(N/2+1));
+    YAPTAZStored = zeros(numCells,1);
+    MRTFStored = zeros(numCells,1);
+    oscVarIdx = 1; % look at BMAL1 here
+    period = zeros(numCells,1);
+    ampl = zeros(numCells,1);
+    oscLogic = false(numCells,1);
+    noiseLevel = [0,0];%[1e-4, 1e-4];
+    for i = 1:numCells
+        varVecCur = varVec.*randn(size(varVec));
+        pCur = pSol' .* exp(varVecCur(1:22));
+        %inhib = [actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), cytD, LATSFactor, blebbiFactor, contactArea]
+        inhibVec = ones(1,8); 
+        inhibVec(1) = 1/(1 + latAConc(k)/.5) + jaspConc(k) / (0.1 + jaspConc(k));
+        inhibVec(4) = 1;%0.1; %10% phosphorylation
+        inhibVec(5) = cytDConc(k); % CytD
+        inhibVec(6) = LATSFactor(k); %high density LATS factor=7.5, low density=1
+        inhibVec(7) = 1/(1 + blebbiConc(k)/1.0);
+        inhibVec(8) = contactArea(k)*exp(varVecCur(23));
+        [period(i),ampl(i),~,~,rawOutput,oscLogic(i)] = conditionToOutputs(pCur,stiffnessVals(k),inhibVec,maxTime,popVar,noiseLevel);
+        T = rawOutput{1};
+        Y = rawOutput{2};
+        ySS = rawOutput{3};
+        %     [T,Y, ySS] = MechanoCircadianModel([0 maxTime], [stiffness,inf,0], pCur, inhibVec, popVar);
+%         plot(T/3600 - 48, Y(:,oscVarIdx))
+        oscCur = interp1(T/3600, Y(:,oscVarIdx), tInterp);
+        YAPTAZStored(i) = ySS(15)/(ySS(17)+ySS(18));
+        MRTFStored(i) = ySS(25)/ySS(26);
+        yPowerCalc = oscCur';%oscStored(i,:)';
+        yPowerCalc = filtfilt([0.2,0.2,0.2,0.2,0.2], 1, yPowerCalc);
+        yPowerCalc = (yPowerCalc - mean(yPowerCalc)) / std(yPowerCalc);
+        Y_fft = fft(yPowerCalc);
+        Y_fft = Y_fft(1:floor(N/2+1));
+        curPower = (1/(Fs*N)) * abs(Y_fft).^2;
+        curPower(2:end-1) = 2*curPower(2:end-1);
+        allPower(i,:) = curPower;
     end
-    amplTest = amplTest/amplTest(1); % normalize to control amplitude
-    obj = sum((periodTest-periodVec1(end:-1:1)).^2); % just period, reversed
-%     obj = sum(50*((periodTest - periodVec1)./periodVec1).^2 + ((amplTest - amplVec1)./amplVec1).^2);% +...
-%         sum(50*((periodTest - periodVec2)./periodVec2).^2 + ((amplTest - amplVec2)./amplVec2).^2);
-%     obj = sum(50*((periodTest - periodVec)./periodVec).^2 + ((amplTest - amplVec)./amplVec).^2);
+    % compute reference period for zero variance
+    refPeriod = conditionToOutputs(pSol,stiffnessVals(k),inhibVec,maxTime);
+    meanPeriod(k) = mean(period(period<maxTime)/3600);
+    stdPeriod(k) = std(period(period<maxTime)/3600);
+    percentOsc(k) = sum(oscLogic) / length(oscLogic);
+    % Compute the "Circadian power fraction"
+    avgPower = mean(allPower,1);
+    freqSelLogic = freq > 0.7/(24*3600) & freq < 1.3/(24*3600);
+    powerSel = avgPower(freqSelLogic);
+    freqSel = freq(freqSelLogic);
+    [~,maxIdx] = max(powerSel);
+    startFit = max([1,maxIdx-2]);
+    endFit = min([length(freqSel),maxIdx+2]);
+    fitAtMax = polyfit(freqSel(startFit:endFit), powerSel(startFit:endFit), 2);
+    rootFreq = roots([2*fitAtMax(1), fitAtMax(2)]);
+    if rootFreq > min(freqSel) && rootFreq < max(freqSel)
+        peakFreq = rootFreq;
+    else
+        peakFreq = 1/(refPeriod);%freq(maxIdx);
+    end
+    powerFraction = zeros(size(allPower,1),1);
+    for i = 1:size(allPower,1)
+        totPower = trapz(freq, allPower(i,:));
+        freqInterp = peakFreq - 0.2/(3600*24):0.001/(3600*24):peakFreq + 0.2/(3600*24);
+        powerInterp = interp1(freq, allPower(i,:), freqInterp);
+        powerFraction(i) = trapz(freqInterp, powerInterp) / totPower;
+    end
+    popSeq{k} = {oscStored, period, ampl, YAPTAZStored, MRTFStored, refPeriod, powerFraction};
 end
+
+%% Random sampling from population
+numSamples = 4;
+samplePeriod = cell(size(stiffnessVals));
+sampleMeans = zeros(size(stiffnessVals));
+sampleStds = zeros(size(stiffnessVals));
+for k = 1:length(stiffnessVals)
+    for j = 1:numSamples
+        curPop = randsample(popSeq{k}{2}, 50);
+        evalLogic = curPop < maxTime;
+        samplePeriod{k}(j) = mean(curPop(evalLogic));
+    end
+%     samplePeriod{k} = bootstrp(numBootstraps, @mean, popSeq{k}{2}(evalLogic));
+    sampleMeans(k) = mean(samplePeriod{k})/3600;
+    sampleStds(k) = std(samplePeriod{k})/3600;
+end
+figure
+errorbar(latAConc, sampleMeans, sampleStds, sampleStds)
+% set(gca,'xscale','log')
+
+%% visualize distributions at each
+medianPeriod = zeros(size(stiffnessVals));
+lowerBarPeriod = zeros(size(stiffnessVals));
+upperBarPeriod = zeros(size(stiffnessVals));
+for i = 1:length(stiffnessVals)
+    distOutput = prctile(popSeq{i}{2}, [25,50,75])/3600;
+    medianPeriod(i) = distOutput(2);
+    lowerBarPeriod(i) = distOutput(2) - distOutput(1);
+    upperBarPeriod(i) = distOutput(3) - distOutput(2);
+end
+figure
+errorbar(latAConc, medianPeriod, lowerBarPeriod, upperBarPeriod)
+
+%% Mimic Abenza plots
+meanPowerFraction = zeros(size(meanPeriod));
+stdPowerFraction = zeros(size(meanPeriod));
+meanYAPTAZ = zeros(size(meanPeriod));
+stdYAPTAZ = zeros(size(meanPeriod));
+meanMRTF = zeros(size(meanPeriod));
+stdMRTF = zeros(size(meanPeriod));
+allYAPTAZ = [];
+allPowerFraction = [];
+allMRTF = [];
+MRTFFig = figure;
+title('MRTF/PowerFraction correlation')
+prettyGraph
+hold on
+YAPTAZFig = figure;
+title('YAPTAZ/PowerFraction correlation')
+prettyGraph
+hold on
+for i = 1:length(popSeq)
+    meanPowerFraction(i) = mean(popSeq{i}{7});
+    stdPowerFraction(i) = std(popSeq{i}{7})/sqrt(length(popSeq{i}{7}));
+    meanYAPTAZ(i) = mean(popSeq{i}{4});
+    stdYAPTAZ(i) = std(popSeq{i}{4})/sqrt(length(popSeq{i}{4}));
+    meanMRTF(i) = mean(popSeq{i}{5});
+    stdMRTF(i) = std(popSeq{i}{5})/sqrt(length(popSeq{i}{5}));
+    allYAPTAZ = [allYAPTAZ; popSeq{i}{4}];
+    allMRTF = [allMRTF; popSeq{i}{5}];
+    allPowerFraction = [allPowerFraction; popSeq{i}{7}];
+    figure(YAPTAZFig)
+    YAPTAZQuart = prctile(popSeq{i}{4},[40,50,60]);
+    MRTFQuart = prctile(popSeq{i}{5},[40,50,60]);
+    powerFractionQuart = prctile(popSeq{i}{7},[40,50,60]);
+%     figure(YAPTAZFig)
+%     errorbar(YAPTAZQuart(2),powerFractionQuart(2),diff(powerFractionQuart(1:2)),diff(powerFractionQuart(2:3)),...
+%         diff(YAPTAZQuart(1:2)), diff(YAPTAZQuart(2:3)),'LineWidth',1,'Marker','o')
+%     figure(MRTFFig)
+%     errorbar(MRTFQuart(2),powerFractionQuart(2),diff(powerFractionQuart(1:2)),diff(powerFractionQuart(2:3)),...
+%         diff(MRTFQuart(1:2)), diff(MRTFQuart(2:3)),'LineWidth',1,'Marker','o')
+    figure(YAPTAZFig)
+    errorbar(meanYAPTAZ(i), meanPowerFraction(i), stdPowerFraction(i), stdPowerFraction(i),...
+            stdYAPTAZ(i), stdYAPTAZ(i),'LineStyle','none','LineWidth',1,'Marker','o')
+    figure(MRTFFig)
+    errorbar(meanMRTF(i), meanPowerFraction(i), stdPowerFraction(i), stdPowerFraction(i),...
+            stdMRTF(i), stdMRTF(i),'LineStyle','none','LineWidth',1,'Marker','o')
+end
+% figure
+% errorbar(meanYAPTAZ, meanPowerFraction, stdPowerFraction, stdPowerFraction,...
+%         stdYAPTAZ, stdYAPTAZ,'LineStyle','none','LineWidth',1,'Marker','s')
+% figure
+% errorbar(meanMRTF, meanPowerFraction, stdPowerFraction, stdPowerFraction,...
+%         stdMRTF, stdMRTF,'LineStyle','none','LineWidth',1,'Marker','s')

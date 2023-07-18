@@ -1,4 +1,4 @@
-function [T,Y, SSVals] = MechanoCircadianModel(timeSpan, treatmentParam, paramList, inhibVec, popVar)
+function [T,Y, SSVals] = MechanoCircadianModel(timeSpan, treatmentParam, paramList, inhibVec, varargin)
 % [T,Y,yinit,param] = EAFTests_Scott_Fraley_Rangamani_YAP_TAZ_model_2021__2D_and_3D_simulations_(argTimeSpan,argYinit,argParam)
 %
 % input:
@@ -17,14 +17,16 @@ function [T,Y, SSVals] = MechanoCircadianModel(timeSpan, treatmentParam, paramLi
 %     example of running this file: [T,Y,yinit,param,allNames,allValues] = myMatlabFunc; <-(your main function name)
 %
 
-%
-% Default time span
-%
-
-% output variable lengh and names
-numVars = 82;
-allNames = {'CofilinP';'Fak';'mDia';'LaminA';'Fcyto';'RhoAGTP_MEM';'mDiaA';'NPCA';'Gactin';'NPC';'ROCKA';'Myo';'CofilinNP';'LaminAp';'YAPTAZnuc';'Fakp';'YAPTAZP';'YAPTAZN';'RhoAGDP';'LIMK';'MyoA';'ROCK';'Positionboolean';'LIMKA';'Kf_r9';'Kf_r8';'Kf_r7';'Kf_r6';'Kf_r5';'Kf_r4';'Kf_r3';'Kf_r2';'Kf_r1';'Kf_r0';'Ecytosol';'Kr_r9';'J_r9';'Kr_r8';'J_r8';'J_r7';'J_r6';'J_r5';'J_r4';'J_r3';'J_r2';'J_r1';'J_r0';'KFlux_NM_Nuc';'Kr_r16';'Kf_r16';'J_r16';'Kf_r15';'J_r15';'Kr_r14';'Kf_r14';'J_r14';'Kr_r13';'Kf_r13';'J_r13';'Kf_r12';'J_r12';'Kr_r11';'Kf_r11';'J_r11';'Kr_r10';'Kf_r10';'J_r10';'KFlux_PM_Cyto';'KFlux_NM_Cyto';'UnitFactor_uM_um3_molecules_neg_1';'YAPTAZratio';'FakConservation';'RhoAConservation';'LIMKConservation';'YAPTAZConservation';'MyoConservation';'mDiaConservation';'ROCKConservation';'CofilinConservation';'LaminAConservation';'NPCConservation';'ActinConservation'};
-
+if isempty(varargin)
+    popVar = 0;
+    noiseLevel = [0,0];
+elseif length(varargin)==1
+    popVar = varargin{1};
+    noiseLevel = [0, 0];
+elseif length(varargin)==2
+    popVar = varargin{1};
+    noiseLevel = varargin{2};
+end
 %
 % Default Initial Conditions
 %
@@ -168,57 +170,50 @@ param = [
 param(17) = treatmentParam(1); % substrate stiffness
 param(104) = treatmentParam(2); % time parameter for stiffness increase
 
-varVecCur = popVar.*randn(size(param(1:104)));
+varVecCur = sqrt(popVar).*randn(size(param(1:104)));
 varVecCur([33:36,47:49,51,64,66,68,72,85,90:92,94,99:100,102:103]) = 0;
 param(1:104) = param(1:104) .* exp(varVecCur);
 
-if length(paramList) ~= 19 % then default parameters
-    param(105) = 9.56*3600; % tauB1
-    param(106) = 3.29; % nExpB
-    param(107) = 1.29/3600; % KeB
-    param(108) = 0.05; % KiB
-    param(109) = 0.62/3600; % KdBP
-    param(110) = 0.49/3600; % KdB
-    param(111) = 11.05*3600; % tauB2
-    param(112) = 3.04; % nExpP
-    param(113) = 1.29/3600; % KeP
-    param(114) = 0.63; % KaP
-    param(115) = 0.50/3600; % KdP
 
-    param(116) = 0.05/3600; %magn of YAPTAZ->Ke coupling
-    param(117) = 1; %Kd for YAPTAZ->Ke
-    param(118) = 2; % Hill coeff for YAPTAZ->Ke
-    param(119) = 0.05/3600;
-    param(120) = 1;
-    param(121) = 2;
-    param(122) = 450;
-else
-    param(105:121) = paramList(1:17);
-    % load inhibition parameters [actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)]
-    param(3) = param(3)*inhibVec(1); % inhibition of actin polymerization
-    param([55,69]) = param([55,69])*inhibVec(2); % inhibit ROCK-mediated catalysis
-    param(119) = param(119)*inhibVec(3); % inhibit coupling between MRTF and circadian
-    param(2) = param(2)*inhibVec(4); % inhibit YAP phosphorylation
-    if inhibVec(4) < 1
-        param([4,56,98]) = 2*param([4,56,98]);
-    end
-    % if applicable, assess cytoD conc
-    param(123) = 0;
-    if length(inhibVec)>4
-        param(123) = inhibVec(5);
-    end
-    if length(inhibVec)>5
-        param(2) = inhibVec(6)*param(2);
-    end
-    param(78) = paramList(19);
+param(105:121) = paramList(1:17);
+% load inhibition parameters [actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)]
+param(3) = param(3)*inhibVec(1); % inhibition of actin polymerization
+param([55,69]) = param([55,69])*inhibVec(2); % inhibit ROCK-mediated catalysis
+param(119) = param(119)*inhibVec(3); % inhibit coupling between MRTF and circadian
+param(2) = param(2)*inhibVec(4); % inhibit YAP phosphorylation
+if inhibVec(4) < 1
+    param([4,56,98]) = 2*param([4,56,98]);
 end
+% if applicable, assess cytoD conc
+param(123) = 0;
+if length(inhibVec)>4
+    param(123) = inhibVec(5);
+end
+if length(inhibVec)>5
+    param(2) = inhibVec(6)*param(2);
+end
+if length(inhibVec)>6
+    param(86) = inhibVec(7)*param(86); % inhibit actomyosin-dependent dephosph. of YAP-TAZ
+    param([5,97]) = inhibVec(8)*param([5,97])/2000; % account for contact area
+end
+param(78) = paramList(19);
 
-param(122) = 86.6114; %43.2495; %112.5; %MRTFReleaseConst
-param(124) = 1.5e6; %1.0724e7; %1.0153; %MRTFTot
-param(125) = 3.8275; %8.4028; %2.6383; %kinsolo_MRTF
-param(126) = 20.9582; %16.5570; %6.2886; %kin2_MRTF
-param(127) = 0.3663; %0.1346; %0.2725; %kout_MRTF
-param(128) = 0.1844; %0.3383; %0.25; %cytoDConst
+
+param(122) = 172.93; %43.2495; %112.5; %MRTFReleaseConst
+param(124) = 3.15e6; %1.0724e7; %1.0153; %MRTFTot
+param(125) = 6.289; %8.4028; %2.6383; %kinsolo_MRTF
+param(126) = 53.98; %16.5570; %6.2886; %kin2_MRTF
+param(127) = 0.8232; %0.1346; %0.2725; %kout_MRTF
+param(128) = 0.461; %0.3383; %0.25; %cytoDConst
+MRTFVariableParam = [122,124,125,126,127];
+varVecMRTF = sqrt(popVar).*randn(size(MRTFVariableParam));
+param(MRTFVariableParam) = param(MRTFVariableParam) .* exp(varVecMRTF)';
+
+% YAP/TAZ-PER/CRY coupling
+param(129:131) = paramList(20:22);
+% MRTF-BMAL1 coupling
+param(132:134) = paramList(23:25);
+param(135) = paramList(29);
 
 %
 % invoke the integrator
@@ -230,14 +225,14 @@ param(128) = 0.1844; %0.3383; %0.25; %cytoDConst
 % for k = 1:length(TRed)
 %     [~,SSVarMat(k,:)] = fRed(TRed(k),YRed(k,:),param);
 % end
-[T,Y] = fDDE(timeSpan,param);
+[T,Y] = fDDE(timeSpan,param,noiseLevel);
 SSVals = fSS(param);
 
 end
 
 
 % reduced dde
-function [t,y] = fDDE(timeSpan,p)
+function [t,y] = fDDE(timeSpan, p, noiseLevel)
 	% State Variables
 
 	% Constants
@@ -375,17 +370,40 @@ function [t,y] = fDDE(timeSpan,p)
     kin2_MRTF  = p(126);
     kout_MRTF = p(127);
     cytoDConst = p(128);
+
+    magCouple3 = p(129); % for YAP/TAZ coupling to PER/CRY
+    KdCouple3 = p(130);
+    nCouple3 = p(131);
+    magCouple4 = p(132); % for MRTF coupling to BMAL1
+    KdCouple4 = p(133);
+    nCouple4 = p(134);
+
+    KdLuc = p(135);
     
-    lags = [tauB1, tauB1];
-%     lags = [tauB1, tauB2];
+    lags = [tauB1, tauB2, 2*3600];
 
 %     DDESol = dde23(@ddefun, lags, @history, timeSpan);
     SSVals = fSS(p);
     YAPTAZnuc_SS = SSVals(15);
     MRTFnuc_SS = SSVals(25);
-    DDESol = dde23(@ddefun_YAPSS, lags, @history_CircOnly, timeSpan);
-    t = DDESol.x';
-    y = DDESol.y';
+    KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
+           magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
+    KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
+           magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
+    unstableSS = fsolve(@(ss) [KeB/(1+(ss(1)/KiB)^pExpB) + KeB2 - KdBP*ss(1)*ss(2) - KdB*ss(1);
+                               KeP/(1+(KaP/ss(1))^pExpP) + KeP2 - KdBP*ss(1)*ss(2) - KdP*ss(2); ...
+                               KeP/(1+(KaP/ss(1))^pExpP) + KeP2 - KdLuc*ss(3)],...
+                [0.1,0.1,0.1]);
+    
+    if all(noiseLevel == 0)
+        DDESol = dde23(@ddefun_YAPSS, lags, @history_CircOnly, timeSpan);
+        t = DDESol.x';
+        y = DDESol.y';
+    elseif all(noiseLevel > 0)
+        [t, y] = sdde_circadian_solve(noiseLevel(1), noiseLevel(2), lags);
+    else
+        error('Noise level must be greater than or equal to zero')
+    end
 	
     function dydt = ddefun(t,y,Z)
         clockLag1 = Z(4,1);
@@ -491,8 +509,10 @@ function [t,y] = fDDE(timeSpan,p)
         nucPerm_MRTF = kinsolo_MRTF + kin2_MRTF*NPCA;
 
         nucPerm = kinSolo2+kin2*NPCTot*kfNPC*y(1)*Fcyto*MyoA/(kfNPC*y(1)*Fcyto*MyoA + krNPC);
-        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc)^nCouple1);
-        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc)^nCouple2);
+        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
+               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
+        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
+               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
 
         % Rates (LaminA, YAPTAZ, MRTF, BMAL, and PER dynamics)
         if YAPTAZTime <= 0
@@ -519,19 +539,64 @@ function [t,y] = fDDE(timeSpan,p)
     function dydt = ddefun_YAPSS(t,y,Z)
         clockLag1 = Z(1,1);
         clockLag2 = Z(1,2);
-        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1);
-        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2);
+        clockLag3 = Z(1,3);
+        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
+               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
+        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
+               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
 
         % Rates (BMAL and PER dynamics)
         dydt = [KeB*(1./(1+(clockLag1/KiB).^pExpB)) - KdBP*y(1)*y(2) - KdB*y(1) + KeB2;
-            KeP*(1./(1+(KaP/clockLag2).^pExpP)) - KdBP*y(1)*y(2) - KdP*y(2) + KeP2];
+                KeP*(1./(1+(KaP/clockLag2).^pExpP)) - KdBP*y(1)*y(2) - KdP*y(2) + KeP2;
+                KeP*(1./(1+(KaP/clockLag3).^pExpP)) - KdLuc*y(3) + KeP2];
     end
 
     function s = history_CircOnly(t)
-        s = [0;
-             0];
+        s = [5*unstableSS(1); 0.2*unstableSS(2); unstableSS(3)];
     end
 
+    function [t,y] = sdde_circadian_solve(eps_B, eps_P, lags)
+
+        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
+               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
+        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
+               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
+        dt = 2; % ~2 s time step
+        delayFactor1 = round(lags(1)/dt);
+        delayFactor2 = round(lags(2)/dt);
+        t = (0:dt:timeSpan(2))';
+        y = zeros(length(t),2);
+        y(1,:) = history_CircOnly(0);
+        dy = zeros(1,2);
+        eta_B = 0;
+        eta_P = 0;
+        rand_stored = sqrt(dt)*randn(length(t)-1, 2);
+        for i = 2:length(t)
+            eta_B = eta_B - dt*eta_B + eps_B*rand_stored(i-1,1) + 0.5*eps_B^2*(rand_stored(i-1,1)^2-dt);
+            eta_P = eta_P - dt*eta_P + eps_P*rand_stored(i-1,2) + 0.5*eps_P^2*(rand_stored(i-1,2)^2-dt);
+            % Rates (BMAL and PER dynamics)
+            B = y(i-1,1);
+            P = y(i-1,2);
+            if t(i-1) < lags(1)
+                BLag1 = y(1,1);
+            else
+                BLag1 = y(i-1-delayFactor1,1);
+            end
+            if t(i-1) < lags(2)
+                BLag2 = y(1,1);
+            else
+                BLag2 = y(i-1-delayFactor2,1);
+            end
+            dy(1) = KeB*(1./(1+(BLag1/KiB).^pExpB)) - KdBP*B*P - KdB*B + KeB2 + eta_B;
+            dy(2) = KeP*(BLag2^pExpP./(BLag2^pExpP+KaP^pExpP)) - KdBP*B*P - KdP*P + KeP2 + eta_P;
+            y(i,:) = y(i-1,:) + dy*dt;
+            if any(y(i,:) < 0)
+                yCur = y(i,:);
+                yCur(yCur < 0) = 0;
+                y(i,:) = yCur;
+            end
+        end
+    end
 end
 
 
