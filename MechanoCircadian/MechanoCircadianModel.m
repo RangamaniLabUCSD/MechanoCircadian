@@ -1,4 +1,4 @@
-function [T,Y, SSVals] = MechanoCircadianModel(timeSpan, treatmentParam, paramList, inhibVec, varargin)
+function [T,Y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, paramList, inhibVec, varargin)
 % [T,Y,yinit,param] = EAFTests_Scott_Fraley_Rangamani_YAP_TAZ_model_2021__2D_and_3D_simulations_(argTimeSpan,argYinit,argParam)
 %
 % input:
@@ -167,8 +167,8 @@ param = [
 	1.0;		% param(102) is 'Positionboolean_init_molecules_um_2'
 	0.001660538783162726;		% param(103) is 'KMOLE'
 ];
-param(17) = treatmentParam(1); % substrate stiffness
-param(104) = treatmentParam(2); % time parameter for stiffness increase
+param(17) = stiffnessParam(1); % substrate stiffness
+param(104) = stiffnessParam(2); % time parameter for stiffness increase
 
 varVecCur = sqrt(popVar).*randn(size(param(1:104)));
 varVecCur([33:36,47:49,51,64,66,68,72,85,90:92,94,99:100,102:103]) = 0;
@@ -199,13 +199,14 @@ end
 param(78) = paramList(19);
 
 
-param(122) = 172.93; %43.2495; %112.5; %MRTFReleaseConst
-param(124) = 3.15e6; %1.0724e7; %1.0153; %MRTFTot
-param(125) = 6.289; %8.4028; %2.6383; %kinsolo_MRTF
-param(126) = 53.98; %16.5570; %6.2886; %kin2_MRTF
-param(127) = 0.8232; %0.1346; %0.2725; %kout_MRTF
-param(128) = 0.461; %0.3383; %0.25; %cytoDConst
-MRTFVariableParam = [122,124,125,126,127];
+param(122) = paramList(30);%172.93; %43.2495; %112.5; %MRTFReleaseConst
+param(124) = 1e6;%3.15e6; %1.0724e7; %1.0153; %MRTFTot
+param(125) = paramList(31);%6.289; %8.4028; %2.6383; %Kinsolo_MRTF
+param(126) = paramList(32);%53.98; %16.5570; %6.2886; %Kin2_MRTF
+% param(127) = 0.8232; %0.1346; %0.2725; %kout_MRTF
+param(127) = paramList(18);%0.461; %0.3383; %0.25; %Kcap (cytoD)
+param(128) = paramList(33); %Kdim (cytoD)
+MRTFVariableParam = [122,124,125,126];
 varVecMRTF = sqrt(popVar).*randn(size(MRTFVariableParam));
 param(MRTFVariableParam) = param(MRTFVariableParam) .* exp(varVecMRTF)';
 
@@ -366,10 +367,10 @@ function [t,y] = fDDE(timeSpan, p, noiseLevel)
     cytoDConc = p(123);
 
     MRTFTot = p(124);
-    kinsolo_MRTF = p(125);
-    kin2_MRTF  = p(126);
-    kout_MRTF = p(127);
-    cytoDConst = p(128);
+    Kinsolo_MRTF = p(125);
+    Kin2_MRTF  = p(126);
+    Kcap = p(127);
+    Kdim = p(128);
 
     magCouple3 = p(129); % for YAP/TAZ coupling to PER/CRY
     KdCouple3 = p(130);
@@ -379,8 +380,9 @@ function [t,y] = fDDE(timeSpan, p, noiseLevel)
     nCouple4 = p(134);
 
     KdLuc = p(135);
+
     
-    lags = [tauB1, tauB2, 2*3600];
+    lags = [tauB1, tauB2, 1*3600]; % third is nominal delay (only affects time shift of reporter, can be any delay in general)
 
 %     DDESol = dde23(@ddefun, lags, @history, timeSpan);
     SSVals = fSS(p);
@@ -565,9 +567,9 @@ function [t,y] = fDDE(timeSpan, p, noiseLevel)
         delayFactor1 = round(lags(1)/dt);
         delayFactor2 = round(lags(2)/dt);
         t = (0:dt:timeSpan(2))';
-        y = zeros(length(t),2);
+        y = zeros(length(t),3);
         y(1,:) = history_CircOnly(0);
-        dy = zeros(1,2);
+        dy = zeros(1,3);
         eta_B = 0;
         eta_P = 0;
         rand_stored = sqrt(dt)*randn(length(t)-1, 2);
@@ -575,7 +577,7 @@ function [t,y] = fDDE(timeSpan, p, noiseLevel)
             eta_B = eta_B - dt*eta_B + eps_B*rand_stored(i-1,1) + 0.5*eps_B^2*(rand_stored(i-1,1)^2-dt);
             eta_P = eta_P - dt*eta_P + eps_P*rand_stored(i-1,2) + 0.5*eps_P^2*(rand_stored(i-1,2)^2-dt);
             % Rates (BMAL and PER dynamics)
-            B = y(i-1,1);
+            B = y(i-1,1);f
             P = y(i-1,2);
             if t(i-1) < lags(1)
                 BLag1 = y(1,1);
@@ -589,6 +591,7 @@ function [t,y] = fDDE(timeSpan, p, noiseLevel)
             end
             dy(1) = KeB*(1./(1+(BLag1/KiB).^pExpB)) - KdBP*B*P - KdB*B + KeB2 + eta_B;
             dy(2) = KeP*(BLag2^pExpP./(BLag2^pExpP+KaP^pExpP)) - KdBP*B*P - KdP*P + KeP2 + eta_P;
+            dy(3) = KeP*(1./(1+(KaP/BLag2).^pExpP)) - KdLuc*y(3) + KeP2 + eta_P;
             y(i,:) = y(i-1,:) + dy*dt;
             if any(y(i,:) < 0)
                 yCur = y(i,:);
@@ -714,10 +717,11 @@ function [SSVar, tauVals] = fSS(p)
     cytoDConc = p(123);
 
     MRTFTot = p(124);
-    kinsolo_MRTF = p(125);
-    kin2_MRTF  = p(126);
-    kout_MRTF = p(127);
-    cytoDConst = p(128);
+    Kinsolo_MRTF = p(125);
+    Kin2_MRTF  = p(126);
+    % kout_MRTF = p(127);
+    Kdim = p(127);
+    Kcap = p(128);
 	
     %SS calcs (some analytical)
     Faktot = Fak_init_uM + Fakp_init_uM;
@@ -761,10 +765,11 @@ function [SSVar, tauVals] = fSS(p)
     CofilinTau = (kturnover + kcatcof*LIMKA/kmCof)^(-1);
 
     ActinTot = Fcyto_init_uM + Gactin_init_uM;
+    kdep_tot = (kdep + kfc1*CofilinNP)*(1 + cytoDConc/Kdim);
     Fcyto = ActinTot*kra*(alpha*smoothmDiaA+1)...
-        /(kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/cytoDConst));
-    Gactin = ActinTot - Fcyto*(1+cytoDConc/cytoDConst);
-    ActinTau = (kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/cytoDConst))^(-1);
+        /(kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap));
+    Gactin = (ActinTot - Fcyto*(1+cytoDConc/Kcap))/(1 + cytoDConc/Kdim);
+    ActinTau = (kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap))^(-1);
 
     MyoTot = Myo_init_uM + MyoA_init_uM;
     MyoA = MyoTot*kmr*(epsilon*smoothROCKA+1)/(kdmy + kmr*(epsilon*smoothROCKA+1));
@@ -804,10 +809,10 @@ function [SSVar, tauVals] = fSS(p)
     YAPTAZnucTau = (Size_Nuc*(kout2/NucConvert + (kinSolo2 + kin2*NPCA)/CytoConvert))^(-1);
 
     MRTFFactor = 1/(1+(Gactin/MRTFReleaseConst)^2);
-    nucPerm_MRTF = kinsolo_MRTF + kin2_MRTF*NPCA;
-    MRTFnuc = (MRTFTot*nucPerm_MRTF*MRTFFactor/CytoConvert) / (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF);
+    nucPerm_MRTF = Kinsolo_MRTF + Kin2_MRTF*NPCA;
+    MRTFnuc = (MRTFTot*nucPerm_MRTF*MRTFFactor/CytoConvert) / (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + 1);
     MRTFcyto = (MRTFTot - MRTFnuc*NucConvert)/CytoConvert;
-    MRTFnucTau = (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF)^(-1);
+    MRTFnucTau = 0;%(nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF)^(-1);
 
 	SSVar = [CofilinP; Fak; mDia; LaminA; Fcyto; RhoAGTP_MEM; mDiaA; NPCA;...
         Gactin; NPC; ROCKA; Myo; CofilinNP; LaminAp; YAPTAZnuc; Fakp;...

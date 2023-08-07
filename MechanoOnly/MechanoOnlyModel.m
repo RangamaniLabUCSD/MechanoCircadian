@@ -45,8 +45,8 @@ yinit = [
 	1.0;		% yinit(22) is the initial condition for 'ROCK'
 	1.0;		% yinit(23) is the initial condition for 'Positionboolean'
 	0.1;		% yinit(24) is the initial condition for 'LIMKA'
-    1.0;        % yinit(25) is the initial condition for 'MRTF'
-    0.3469      % yinit(26) is the initial condition for 'MRTFnuc'
+    1.9;        % yinit(25) is the initial condition for 'MRTF'
+    1.5649      % yinit(26) is the initial condition for 'MRTFnuc'
 ];
 
 %
@@ -370,11 +370,11 @@ function dydt = f(t,y,p,y0)
 	KFlux_NM_Cyto = (Size_NM ./ Size_Cyto);
 	UnitFactor_uM_um3_molecules_neg_1 = (1000000.0 ./ 6.02214179E8);
     
-    % define MRTF fluxes
-    MRTFReleaseConst = 86.6114; %43.2495; %112.5; %MRTFReleaseConst
-    kinsolo_MRTF = 3.8275; %8.4028; %2.6383; %kinsolo_MRTF
-    kin2_MRTF = 20.9582; %16.5570; %6.2886; %kin2_MRTF
-    kout_MRTF = 0.3663; %0.1346; %0.2725; %kout_MRTF
+    % define MRTF fluxes, MRTFTot should be 3.15e6
+    MRTFReleaseConst = 172.93; %43.2495; %112.5; %MRTFReleaseConst
+    kinsolo_MRTF = 6.289; %8.4028; %2.6383; %kinsolo_MRTF
+    kin2_MRTF = 53.98; %16.5570; %6.2886; %kin2_MRTF
+    kout_MRTF = 0.8232; %0.1346; %0.2725; %kout_MRTF
     Kr_MRTF = kout_MRTF;
 	Kf_MRTF = ((kin2_MRTF .* NPCA) + kinsolo_MRTF) * (1/(1 + (Gactin / MRTFReleaseConst) ^ 2.0));
 	J_MRTF = ((Kf_MRTF .* MRTF) - (Kr_MRTF .* MRTFnuc));

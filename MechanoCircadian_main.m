@@ -1,10 +1,10 @@
 %% Test mechano-Circadian model under different conditions
 stiffnessVals = logspace(-1,3,20);
-inhibMag = 0;%0:.02:1;%0:.05:5;
+inhibMag = 0;%0:.1:.5;%0:.02:.5;%0:.05:5;
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
 inhibMag = inhibMesh(:);
-jaspConc = inhibMag;
+% jaspConc = inhibMag;
 
 % kraMult = logspace(-1,0.5,50);
 maxTime = 3600*480;
@@ -19,7 +19,7 @@ FcytoEq = zeros(size(stiffnessVals));
 GactinEq = zeros(size(stiffnessVals));
 figure
 hold on
-colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plots
+colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plotsg
 % colorSeries = [0,0,0; 0,.25,.66; .57,.75,.98];
 % colorSeries = colororder;
 noiseLevel = [0,0];%[.5e-4, .5e-4];
@@ -29,37 +29,48 @@ for i = 1:length(stiffnessVals)
 %     coupleParam(2,1) = (1-ratioVals(i))*.5/3600;
     % paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
     paramList = pSol;
-    actinInhib = 1 + pSol(27)*jaspConc(i)/(pSol(28) + jaspConc(i));%1 / (1 + (inhibMag(i)/paramList(18)));
+    latBConc = 0;
+    jaspConc = inhibMag(i);
+    actinInhib =  1 / (1 + (latBConc/paramList(26))) + pSol(27)*jaspConc/(pSol(28) + jaspConc);
     ROCKInhib = 1;% / (1 + (inhibMag(i)/2));
     MRTFInhib = 1;%inhibMag(i);
     YAPInhib = 1;%inhibMag(i);
-    cytoDConc = 0;%inhibMag(i);
+    cytoDConc = inhibMag(i);%inhibMag(i);
     LATSFactor = 1;%inhibMag(i);%7.5;
     inhibVec = [actinInhib, ROCKInhib, MRTFInhib, YAPInhib, cytoDConc, LATSFactor]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)] 
 %     [T,Y, ySS] = MechanoCircadianModel([0 maxTime], [stiffnessVals(i),inf,inhibMag(i)], paramList, inhibVec, 0);%kraMult(i));
-    [period(i), amplitude(i), ~, ~, rawOutput,oscDecayRate(i)] = conditionToOutputs(pSol,stiffnessVals(i),inhibVec,maxTime,0,noiseLevel);
+    [periodCur, amplitudeCur, ~, ~, rawOutput,oscDecayRateCur] = conditionToOutputs(pSol,stiffnessVals(i),inhibVec,maxTime,0,noiseLevel);
+    period(i) = periodCur(3);
+    amplitude(i) = amplitudeCur(3);
+    oscDecayRate(i) = oscDecayRateCur(3);
     T = rawOutput{1};
     Y = rawOutput{2};
     ySS = rawOutput{3};
     oscVarIdx = 2;
     if mod(i-1,1)==0
+        refConc = 20;
         % plot(T/(24*3600),Y(:,oscVarIdx),'LineWidth',0.5,'LineStyle','-','Marker','none')%,'Color',colorSeries(i,:))
-        oscDynamics = Y(:,3);%3600*pSol(9)./(1 + (pSol(10)./Y(:,1)).^pSol(8));
-        plot(T/(24*3600),oscDynamics,'LineWidth',0.5,'LineStyle','-','Marker','none')%,'Color',colorSeries(i,:))
+        oscDynamics = Y(:,2);%3600*pSol(9)./(1 + (pSol(10)./Y(:,1)).^pSol(8));
+        [~,locs] = findpeaks(oscDynamics);
+        tShift = T(locs(2))/(24*3600);
+        TInterp = 0:15*60:maxTime;
+        oscDynamics = interp1(T, oscDynamics, TInterp');
+        plot(TInterp/(24*3600) - tShift,refConc*oscDynamics,'LineWidth',1,...
+            'LineStyle','-','Marker','none')%,'Color',colorSeries(i,:))
         xlim([0 5])
 %         ylim([0 .5])
-        ylabel('PER/CRY abundance')
+        ylabel('Nuclear concentration (nM)')
         xlabel('Time (days)')
-%         yyaxis right
-%         plot(T/(24*3600) - 10,Y(:,1),'LineWidth',1,'LineStyle','-','Marker','none')
-%         ylabel('BMAL1 abundance')
+        % yyaxis right
+        % plot(T/(24*3600) - tShift,refConc*Y(:,1),'LineWidth',1,'LineStyle','-','Marker','none')
+        % ylabel('Relative BMAL1 abundance')
 % %         ylim([0 0.7])
 %         legend('PER/CRY','BMAL1')
-%         prettyGraph
+        prettyGraph
     end
     eqTimeIdx = find(T>72*3600);
-    YAPTAZEq(i) = ySS(15)/(ySS(17)+ySS(18));%mean(Y(eqTimeIdx,2));
-    MRTFEq(i) = ySS(25)/ySS(26);%mean(Y(eqTimeIdx,3));
+    YAPTAZEq(i) = ySS(15);%/(ySS(17)+ySS(18));%mean(Y(eqTimeIdx,2));
+    MRTFEq(i) = ySS(25);%/ySS(26);%mean(Y(eqTimeIdx,3));
     FcytoEq(i) = ySS(5);
     GactinEq(i) = ySS(9);
 end
@@ -74,70 +85,43 @@ end
 % for i = 1:length(period)
 %     b.CData(i,:) = colorSeries(i,:);
 % end
-%% CytD validation
-FibroblastCytDPeriod = [24.2103,    0.2060; % Control
-                        24.9957,    0.1803; % 1 uM CytD
-                        24.9700,    0.0258; % 2 uM CytD
-                        24.6352,    0.3991];% 5 uM CytD
-FibroblastCytDAmpl = [1.0000,    0.1954; % Control
-                      1.2874,    0.1494; % 1 uM CytD
-                      1.6552,    0.3218; % 2 uM CytD
-                      1.9425,    0.3908]; % 5 uM CytD
-
-CytDTests = 0:.2:10;
-CytDPeriod = zeros(size(CytDTests));
-CytDAmpl = zeros(size(CytDTests));
-for i = 1:length(CytDTests)
-    inhibVec = [1, 1, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytoDConc] 
-    [CytDPeriod(i), CytDAmpl(i)] = conditionToOutputs(pSol, 1e7, inhibVec, 480*3600);
-end
+%% plot detailed control case
+refConc = 20;
+maxTime = 120*3600;
+inhibVec = [1, 1, 1, 1, 0, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), cytD, LATS] 
+[t, y, ySS] = MechanoCircadianModel([0 maxTime], [stiffnessVals(i),inf], paramList, inhibVec, 0);%kraMult(i));
+[~,locs] = findpeaks(y(:,2));
+tShift = T(locs(2))/(3600);
 figure
-% subplot(1,2,1)
-plot(CytDTests, CytDPeriod/3600, 'LineWidth', 1)
+subplot(3,1,1)
+plot(t/3600 - tShift,refConc*y(:,1), 'LineWidth', 1.5)
+xlabel('Time (hr)')
+ylabel({'Nuclear concentration', '(nM)'})
 hold on
-CytDConc = [0, 1, 2, 5];
-errorbar(CytDConc, FibroblastCytDPeriod(:,1),...
-    FibroblastCytDPeriod(:,2), FibroblastCytDPeriod(:,2),...
-    'LineStyle','none','LineWidth',1,'Marker','s')
-xlim([0 6])
-% subplot(1,2,2)
-% plot(CytDTests, CytDAmpl/CytDAmpl(1), 'LineWidth', 1)
-% hold on
-% errorbar(CytDConc, FibroblastCytDAmpl(:,1),...
-%     FibroblastCytDAmpl(:,2), FibroblastCytDAmpl(:,2),...
-%     'LineStyle','none','LineWidth',1,'Marker','s')
-% xlim([0 6])
-
-%% LatB validation
-FibroblastLatBPeriod = [24.9389,    0.1048;
-                        25.4105,    0.1921;
-                        25.9694,    0.2620];
-FibroblastLatBAmpl = [1.0000,    0.0235;
-                      1.6118,    0.1412;
-                      2.3765,    0.0588];
-LatBTests = 0:.1:4;
-LatBPeriod = zeros(size(LatBTests));
-LatBAmpl = zeros(size(LatBTests));
-for i = 1:length(LatBTests)
-    inhibVec = [1/(1 + LatBTests(i)/0.5), 1, 1, 1, 0]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytoDConc] 
-    [LatBPeriod(i), LatBAmpl(i)] = conditionToOutputs(pSol, 1e7, inhibVec, 480*3600);
-end
-figure
-% subplot(1,2,1)
-plot(LatBTests, LatBPeriod/3600, 'LineWidth', 1)
+% yyaxis right
+plot(t/3600 - tShift,refConc*y(:,2), 'LineWidth', 1.5)
+% ylabel('PER/CRY abundance')
+xlim([0 48])
+prettyGraph
+subplot(3,1,2)
+KeB = pSol(3)./(1 + (y(:,1)./pSol(4)).^pSol(2));
+KeP = pSol(9)./(1 + (pSol(10)./y(:,1)).^pSol(8));
+plot((t+pSol(1))/3600 - tShift, refConc*KeB*3600, 'LineWidth', 1.5)
+xlabel('Time (hr)')
+ylabel({'Expression rate', '(nM/hr)'})
 hold on
-LatBConc = [0, 1, 2];
-errorbar(LatBConc, FibroblastLatBPeriod(:,1),...
-    FibroblastLatBPeriod(:,2), FibroblastLatBPeriod(:,2),...
-    'LineStyle','none','LineWidth',1,'Marker','s')
-xlim([0 6])
-% subplot(1,2lim(,2)
-% plot(LatBTests, LatBAmpl/LatBAmpl(1), 'LineWidth', 1)
-% hold on
-% errorbar(LatBConc, FibroblastLatBAmpl(:,1),...
-%     FibroblastLatBAmpl(:,2), FibroblastLatBAmpl(:,2),...
-%     'LineStyle','none','LineWidth',1,'Marker','s')
-% xlim([0 6])
+% yyaxis right
+plot((t+pSol(7))/3600 - tShift, refConc*KeP*3600, 'LineWidth', 1.5)
+% ylabel({'PER/CRY','expression rate (1/hr)'})
+xlim([0 48])
+prettyGraph
+subplot(3,1,3)
+KdBP = refConc*3600*pSol(5)*y(:,1).*y(:,2);
+plot(t/3600 - tShift, KdBP, 'LineWidth', 1.5)
+xlim([0 48])
+xlabel('Time (hr)')
+ylabel({'B-P degradation', 'rate (nM/hr)'})
+prettyGraph
 
 %% generate population
 % lower YAPTAZ in nucleus: 1.25 uM

@@ -12,8 +12,9 @@ hold on
 % KeB2 = .1; KeP2 = .1;
 % par = [tauB1*3600, pExpB, KeB/3600, KiB, KdBP/3600, KdB/3600,...
 %     tauB2*3600, pExpP, KeP/3600, KaP, KdP/3600, .1/3600, .1/3600];
-par = pSol;
-par(29:30) = [2,0.1];
+par = zeros(1,length(pSol));
+par(:) = pSol;
+par(29:30) = [2, 2];
 % par(12) = pSol(12) + pSol(23);
 % par(13) = pSol(15) + pSol(20);
 par(1) = par(1)/3600;
@@ -26,13 +27,15 @@ funcs=set_funcs(...
 % KeP2Vals = pSol(13);%*[0,.1,.2,.5,1,2,5,10];
 % KdBPVals = par(5)*[0,.1,.2,.5,1,2,5,10,50,100,500,1000];%[0,.1,.2,.5,1,2,5,10];%,5,10];
 % KeB2Init = par(12)*[0,0,0,0,0,0,.5,1,2,2,2,2];%zeros(1,8);%[0,1,.1,.1,.1];
-KdBPVals = par(5)*[0,.1,1,10];%[0,1,10,100,1000];
-YInit = par(29)*[.5,.7,1,3];
+KdBPVals = par(5)*[0,.1,.3,1,3];%[0,1,10,100,1000];
+YInit = par(29)*[.5,.5,.7,1.5,15];
+Minit = par(30)*[1,1,1,1,20];
 % KeB2Init = par(12)*[0,0,.2,1.5];%[0,0,1,2,2];
 plotLogic = false;
-for i = 1:1%length(KdBPVals)
+for i = 4%1:length(KdBPVals)
     par(5) = KdBPVals(i);
     par(29) = YInit(i);
+    par(30) = Minit(i);
 %     par(13) = KeP2Vals(i);%.5;
     % compute ss
     stst.kind='stst';
@@ -127,8 +130,8 @@ for i = 1:1%length(KdBPVals)
     ind_M = 30;
     branch2=df_brnch(funcs,[ind_Y,ind_M],'hopf'); % use hopf point as first point of hopf branch:
     branch2.parameter.min_bound(1:2,:)=[[ind_Y 0]' [ind_M 0]']';
-    branch2.parameter.max_bound(1:2,:)=[[ind_Y 50]' [ind_M 50]']';
-    branch2.parameter.max_step(1:2,:)=[[ind_Y .005]' [ind_M .005]']';
+    branch2.parameter.max_bound(1:2,:)=[[ind_Y 20]' [ind_M 20]']';
+    branch2.parameter.max_step(1:2,:)=[[ind_Y .05]' [ind_M .05]']';
 %     branch2=df_brnch(funcs,[ind_KeB2,ind_KdBP],'hopf'); % use hopf point as first point of hopf branch:
 %     branch2.parameter.min_bound(1:2,:)=[[ind_KeB2 0]' [ind_KdBP 0]']';
 %     branch2.parameter.max_bound(1:2,:)=[[ind_KeB2 1e-3]' [ind_KdBP 1e-3]']';
@@ -217,8 +220,14 @@ function y = circadian_rhs(xx,par)
     KdP = par(11)*3600;
     Y = par(29);
     M = par(30);
-    KeB2 = 3600*(par(12)*Y^2/(par(13)^2+Y^2) + par(23)*M^2/(par(24)^2+M^2));
-    KeP2 = 3600*(par(15)*M^2/(par(16)^2+M^2) + par(20)*Y^2/(par(21)^2+Y^2));
+    CytoConv = 1.3851e6;
+    NucConv = 3.3122e5;
+    Ytot = 1.4784e6;
+    Mtot = 1e6;
+    YConc = Y*Ytot./(CytoConv + Y*NucConv);
+    MConc = M*Mtot./(CytoConv + M*NucConv);
+    KeB2 = 3600*(par(12)*YConc^2/(par(13)^2+YConc^2) + par(23)*MConc^2/(par(24)^2+MConc^2));
+    KeP2 = 3600*(par(15)*MConc^2/(par(16)^2+MConc^2) + par(20)*YConc^2/(par(21)^2+YConc^2));
     y = [KeB/(1+(BLag1/KiB)^nB) + KeB2 - KdBP*B*P - KdB*B;
          KeP/(1+(KaP/BLag2)^nP) + KeP2 - KdBP*B*P - KdP*P];
 end

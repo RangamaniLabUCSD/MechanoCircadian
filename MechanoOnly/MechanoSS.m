@@ -77,9 +77,9 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         0.0;		% param(75) is 'Kr_r7'
         0.0;		% param(76) is 'Kr_r6'
         0.0;		% param(77) is 'Kr_r5'
-        MRTFParam(9);%3.25;		% param(78) is 'C'
+        MRTFParam(8);%3.25;		% param(78) is 'C'
         0.0;		% param(79) is 'Kr_r4'
-        0.0;		% param(80) is 'Kr_r3'
+        0.0;		% param(80) is 'Kr_r3
         0.0;		% param(81) is 'Kr_r2'
         0.0;		% param(82) is 'Kr_r1'
         0.0;		% param(83) is 'Kr_r0'
@@ -121,12 +121,12 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         param(123) = inhibVec(5);
     end
     % MRTF parameters (124:128)
-    param(124) = MRTFParam(1); %MRTFTot;
-    param(125) = MRTFParam(2); %kinsolo_MRTF;
-    param(126) = MRTFParam(3); %kin2_MRTF;
-    param(127) = MRTFParam(4); %kout_MRTF;
-    param(128) = MRTFParam(5); %MRTFReleaseConst
-    param(129) = MRTFParam(6); %CytDConst
+    param(124) = 1e6;%MRTFParam(1); %MRTFTot;
+    param(125) = MRTFParam(1); %Kinsolo_MRTF;
+    param(126) = MRTFParam(2); %Kin2_MRTF;
+    param(127) = MRTFParam(3); %MRTFReleaseConst
+    param(128) = MRTFParam(4); %Kcap (CytoD)
+    param(129) = MRTFParam(5); %Kdim (CytoD)
 
     p = param;
 
@@ -244,11 +244,12 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 
     cytoDConc = p(123);
     MRTFTot = p(124);
-    kinsolo_MRTF = p(125);
-    kin2_MRTF  = p(126);
-    kout_MRTF = p(127);
-    MRTFReleaseConst = p(128);
-    cytoDConst = p(129);
+    Kinsolo_MRTF = p(125);
+    Kin2_MRTF  = p(126);
+    MRTFReleaseConst = p(127);
+    Kcap = p(128);
+    Kdim = p(129);
+
 	
     %SS calcs (some analytical)
     Faktot = Fak_init_uM + Fakp_init_uM;
@@ -292,10 +293,11 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
     CofilinTau = (kturnover + kcatcof*LIMKA/kmCof)^(-1);
 
     ActinTot = Fcyto_init_uM + Gactin_init_uM;
+    kdep_tot = (kdep + kfc1*CofilinNP)*(1 + cytoDConc/Kdim);
     Fcyto = ActinTot*kra*(alpha*smoothmDiaA+1)...
-        /(kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/cytoDConst));
-    Gactin = ActinTot - Fcyto*(1+cytoDConc/cytoDConst);
-    ActinTau = (kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/cytoDConst))^(-1);
+        /(kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap));
+    Gactin = (ActinTot - Fcyto*(1+cytoDConc/Kcap))/(1 + cytoDConc/Kdim);
+    ActinTau = (kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap))^(-1);
 
     MyoTot = Myo_init_uM + MyoA_init_uM;
     MyoA = MyoTot*kmr*(epsilon*smoothROCKA+1)/(kdmy + kmr*(epsilon*smoothROCKA+1));
@@ -336,10 +338,10 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 
     %MRTF
     MRTFFactor = 1/(1+(Gactin/MRTFReleaseConst)^2);
-    nucPerm_MRTF = kinsolo_MRTF + kin2_MRTF*NPCA;
-    MRTFnuc = (MRTFTot*nucPerm_MRTF*MRTFFactor/CytoConvert) / (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF);
+    nucPerm_MRTF = Kinsolo_MRTF + Kin2_MRTF*NPCA;
+    MRTFnuc = (MRTFTot*nucPerm_MRTF*MRTFFactor/CytoConvert) / (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + 1);
     MRTFcyto = (MRTFTot - MRTFnuc*NucConvert)/CytoConvert;
-    MRTFnucTau = (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF)^(-1);
+    MRTFnucTau = (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + 1)^(-1);
 
 	SSVar = [CofilinP; Fak; mDia; LaminA; Fcyto; RhoAGTP_MEM; mDiaA; NPCA;...
         Gactin; NPC; ROCKA; Myo; CofilinNP; LaminAp; YAPTAZnuc; Fakp;...
