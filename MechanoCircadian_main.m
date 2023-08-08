@@ -1,6 +1,6 @@
 %% Test mechano-Circadian model under different conditions
-stiffnessVals = logspace(-1,3,20);
-inhibMag = 0;%0:.1:.5;%0:.02:.5;%0:.05:5;
+stiffnessVals = 1e7;%logspace(-1,3,20);
+inhibMag = 0:.1:.5;%0:.02:.5;%0:.05:5;
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
 inhibMag = inhibMesh(:);
@@ -25,13 +25,9 @@ colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plotsg
 noiseLevel = [0,0];%[.5e-4, .5e-4];
 
 for i = 1:length(stiffnessVals)
-%     coupleParam(1,1) = ratioVals(i)*.5/3600;
-%     coupleParam(2,1) = (1-ratioVals(i))*.5/3600;
-    % paramList = [9.5582, 3.2924, 1.2876, 0.0499, 0.6165, 0.4856, 11.0546, 3.0365, 1.2880, 0.6255, 0.5021, coupleParam(1,:), coupleParam(2,:), 1];
-    paramList = pSol;
     latBConc = 0;
     jaspConc = inhibMag(i);
-    actinInhib =  1 / (1 + (latBConc/paramList(26))) + pSol(27)*jaspConc/(pSol(28) + jaspConc);
+    actinInhib =  1 / (1 + (latBConc/pSol(26))) + (1 + pSol(27))*jaspConc / pSol(28);
     ROCKInhib = 1;% / (1 + (inhibMag(i)/2));
     MRTFInhib = 1;%inhibMag(i);
     YAPInhib = 1;%inhibMag(i);

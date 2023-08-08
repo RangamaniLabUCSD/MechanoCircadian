@@ -163,9 +163,7 @@ hold on
 jaspVals = 0:.01:1.5;
 MRTFEq = zeros(size(jaspVals));
 for i = 1:length(jaspVals)
-    actinPolyFactor = 1 + pSolMRTF(5)*jaspVals(i)/(pSolMRTF(6) + jaspVals(i));
-    % actinPolyFactor = 1 + (1+pSolMRTF(5)+2*jaspVals(i)/pSolMRTF(6))*...
-    %                 jaspVals(i)/(pSolMRTF(6) + jaspVals(i));
+    actinPolyFactor = 1 + (1+pSolMRTF(5))*jaspVals(i)/pSolMRTF(6);
     inhibVec = [actinPolyFactor,1,1,1, 0];
     stiffnessVec = [1e7,inf,0];
     SSVar = MechanoSS(stiffnessVec, inhibVec, pSolMRTF);
@@ -326,7 +324,7 @@ function obj = pToObj_MRTF(p)
 
     MRTFEqTest = zeros(size(MRTFEqData));
     for i = 1:length(cytDTests)
-        actinPolyFactor = 1 + p(7)*jaspTests(i)/(p(8) + jaspTests(i));
+        actinPolyFactor = 1 + (1+p(7))*jaspTests(i)/p(8);
         inhibVec = [actinPolyFactor,1,1,1, cytDTests(i)];
         stiffnessVec = [stiffnessTests(i),inf,0];
         SSVar = MechanoSS(stiffnessVec, inhibVec, p);
@@ -366,9 +364,7 @@ function MRTFEqTest = forwardModel_MRTF(p)
     for k = 1:size(p,1)
         pCur = p0'.*p(k,:);
         for i = 1:length(cytDTests)
-            actinPolyFactor = 1;%1 + pCur(5)*jaspTests(i)/(pCur(6) + jaspTests(i));
-            % actinPolyFactor = 1 + (1+pCur(5)+2*jaspTests(i)/pCur(6))*...
-            %     jaspTests(i)/(pCur(6) + jaspTests(i));
+            actinPolyFactor = 1;%1 + (1+pCur(5))*jaspTests(i)/pCur(6);
             inhibVec = [actinPolyFactor,1,1,1, cytDTests(i)];
             stiffnessVec = [stiffnessTests(i),inf,0];
             SSVar = MechanoSS(stiffnessVec, inhibVec, pCur);

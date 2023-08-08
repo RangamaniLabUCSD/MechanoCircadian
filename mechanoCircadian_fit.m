@@ -459,7 +459,7 @@ for k = 1:length(groups)
     prettyGraph
     for i = groups{k}
         ROCKLevel =  1 / (1 + (ROCKInhibTests(i)/pSol(18)));
-        kra_cur = 1 / (1 + (LatBTests(i)/pSol(26))) + pSol(27)*JasTests(i) / (pSol(28) + JasTests(i));
+        kra_cur = 1 / (1 + (LatBTests(i)/pSol(26))) + (1 + pSol(27))*JasTests(i) / pSol(28);
         inhibVec = [kra_cur, ROCKLevel, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD]
         [periodCur, amplCur, ~, ~, rawOutput] = conditionToOutputs(pSol, stiffnessTests(i), inhibVec);
         t = rawOutput{1};
@@ -533,7 +533,7 @@ function [obj, periodTest, amplTest] = pToObj_CircadianClockFibroblast(p)
     minVals = zeros(size(periodVec));
     for i = modelCases
         ROCKLevel =  1 / (1 + (ROCKInhibTests(i)/p(18)));
-        kra_cur = 1 / (1 + (LatBTests(i)/p(26))) + p(27)*JasTests(i) / (p(28) + JasTests(i));
+        kra_cur = 1 / (1 + (LatBTests(i)/p(26))) + (1 + p(27))*JasTests(i) / p(28);
         inhibVec = [kra_cur, ROCKLevel, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD] 
         [periodCur, amplCur, t, y] = conditionToOutputs(p, stiffnessTests(i), inhibVec);
         periodTest(i) = periodCur(3);
@@ -642,7 +642,7 @@ function logLikelihood = mechanoCircadian_logLikelihoodDyn(p, y)
         minVals = zeros(size(JasTests));
         for i = modelCases
             ROCKLevel =  1 / (1 + (ROCKInhibTests(i)/pCur(18)));
-            kra_cur = 1 / (1 + (LatBTests(i)/pCur(26))) + pCur(27)*JasTests(i) / (pCur(28) + JasTests(i));
+            kra_cur = 1 / (1 + (LatBTests(i)/pCur(26))) + (1 + pCur(27))*JasTests(i) / pCur(28);
             inhibVec = [kra_cur, ROCKLevel, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD]
             [~, amplCur, t, y] = conditionToOutputs(pCur, stiffnessTests(i), inhibVec);
             amplTest(i) = amplCur(3);
@@ -739,7 +739,7 @@ function logLikelihood = mechanoCircadian_logLikelihoodPeriod(p, y)
         minVals = zeros(size(JasTests));
         for i = modelCases
             ROCKLevel =  1 / (1 + (ROCKInhibTests(i)/pCur(18)));
-            kra_cur = 1 / (1 + (LatBTests(i)/pCur(26))) + pCur(27)*JasTests(i) / (pCur(28) + JasTests(i));
+            kra_cur = 1 / (1 + (LatBTests(i)/pCur(26))) + (1 + pCur(27))*JasTests(i) / pCur(28);
             inhibVec = [kra_cur, ROCKLevel, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD]
             [periodCur, amplCur, t, y] = conditionToOutputs(pCur, stiffnessTests(i), inhibVec);
             amplTest(i) = amplCur(3);
@@ -778,7 +778,7 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
         for i = 1:size(testsMat,2)
             ROCKLevel =  1 / (1 + (testsMat(2,i)/pCur(18)));
             kra_cur = 1 / (1 + (testsMat(4,i)/pCur(26))) +...
-                pCur(27)*testsMat(5,i) / (pCur(28) + testsMat(5,i));
+                (1 + pCur(27))*testsMat(5,i)/pCur(28);
             inhibVec = [kra_cur, ROCKLevel, 1, 1, testsMat(3,i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD] 
             [curPeriod, curAmpl] = conditionToOutputs(pCur, testsMat(1,i), inhibVec, 3600*480);
             periodTests{i}(k) = curPeriod(3);
@@ -799,7 +799,7 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
         for i = 1:size(plotDynMat,2)
             ROCKLevel =  1 / (1 + (plotDynMat(2,i)/pCur(18)));
             kra_cur = 1 / (1 + (plotDynMat(4,i)/pCur(26))) +...
-                pCur(27)*plotDynMat(5,i) / (pCur(28) + plotDynMat(5,i));
+                (1+pCur(27))*plotDynMat(5,i) / pCur(28);
             inhibVec = [kra_cur, ROCKLevel, 1, 1, plotDynMat(3,i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD] 
             [~, ~, t, y] = conditionToOutputs(pCur, plotDynMat(1,i), inhibVec, 3600*480);
             storeLogic = t <= 24*5*3600;
