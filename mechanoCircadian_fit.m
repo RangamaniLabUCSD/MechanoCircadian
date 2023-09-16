@@ -1,5 +1,5 @@
 %% Fit YAPTAZ circadian model to stiffness data
-p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 6*3600; 2; 1/3600; .5; 0.4/3600;...
+p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; 0.4/3600];
 % p0(end) = 10;
 lowerLim = p0/4;
@@ -77,6 +77,8 @@ shiftVal = min(meanDynVals(:) - stdDynVals(:));
 dataVec = [meanDynVals-shiftVal; stdDynVals];
 y = struct;
 y.dataVec = dataVec;
+
+%%
 fixedParam = [2, 8, 14, 17, 22, 25];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
@@ -97,21 +99,21 @@ pAll = ones(3,23);
 logLikelihood = mechanoCircadian_logLikelihoodPeriod(pAll, y)
 
 %%
-p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 6*3600; 2; 1/3600; .5; 0.4/3600;...
-    0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; 0.4/3600;...
-    100; 1; 10; 2];
+p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
+    0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
+    100; 1; 10; 2; 2];
 rng(100,'twister')
 uqlab
 paramNames = {'tauB','nB','KeB0','KiB','KdBP','KdB',...
               'tauP','nP','KeP0','KaP','KdP',...
               'KeB2,Y','KYB','nYB','KeP2,M','KMP','nMP'...
-              'Kcap', 'StiffThresh',...
+              'ROCKInhibSens', 'StiffThresh',...
               'KeP2,Y','KYP','nYP','KeB2,M','KMB','nMB',...
               'LatBSens','JasMag','JasSens','KdLuc',...
-              'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim'};
-numParam = 33;
+              'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap'};
+numParam = 34;
 PriorOpts.Name = 'Prior distribution on mechano-Circadian parameters';
-fixedParam = [1, 2, 7, 8, 14, 17, 22, 25];
+fixedParam = [2, 8, 14, 17, 22, 25];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 for i = 1:numParam
@@ -121,7 +123,7 @@ for i = 1:numParam
         PriorOpts.Marginals(i).Parameters = 1;
     elseif i==1 || i==7
         PriorOpts.Marginals(i).Type = 'Uniform';
-        PriorOpts.Marginals(i).Parameters = [.8 1.25];
+        PriorOpts.Marginals(i).Parameters = [.8 1.2];
     else
         PriorOpts.Marginals(i).Type = 'Uniform';
         PriorOpts.Marginals(i).Parameters = [.25 4];
@@ -133,9 +135,10 @@ myData.Name = 'PER expression oscillation';
 Solver.Type = 'MCMC';
 Solver.MCMC.Sampler = 'AIES';
 Solver.MCMC.NChains = 60;
-Solver.MCMC.Steps = 2000;
+Solver.MCMC.Steps = 6000;
 Solver.MCMC.Visualize.Parameters = 3;%[3 8];
 Solver.MCMC.Visualize.Interval = 50;
+Solver.MCMC.Seed = initialSeed;
 BayesOpts.Type = 'Inversion';
 BayesOpts.Name = 'Bayesian model';
 BayesOpts.Prior = myPriorDist;
@@ -150,44 +153,79 @@ uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP')
 modeVals = myBayesianAnalysis.Results.PostProc.PointEstimate.X{1};
 pSol = p0;
 pSol(varyLogic) = pSol(varyLogic) .* modeVals';
-save('bayesianAnalysis_DynOnly_fixedDelays_withMRTFParams.mat','myBayesianAnalysis')
+save('bayesianAnalysisDyn_fitDelays_allInhibandMRTF_4xVary_sepLuc2hrHalfLife_FIX_to10000.mat','myBayesianAnalysis')
+
+%% Test convergence of MCMC
+samples = myBayesianAnalysis.Results.Sample;
+numParam = size(samples,2);
+numWalkers = size(samples,3);
+Nsteps = size(samples,1);
+IACTs = zeros(numParam,numWalkers); % matrix of IACTs (nParam x nWalkers)
+for k=1:numWalkers
+    for j=1:numParam
+        % parameters here are essentially all default!
+        [~,~,~,tauinttmp,~,~] = UWerr_fft(squeeze(samples(:,j,k)),1.5,Nsteps,1,1,1);
+        IACTs(j,k) = tauinttmp;
+    end
+end
+% 2) Take the average over each walker:
+meanIACTs = mean(IACTs,2);
+% 3) Take the max over all set of params
+IACT = max(meanIACTs)
 
 %% plot posteriors
-fixedParam = [1, 2, 7, 8, 14, 17, 22, 25];
+fixedParam = [2, 8, 14, 17, 22, 25];
+p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
+    0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
+    100; 1; 10; 2; 2];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 paramMap = find(varyLogic);
-p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 6*3600; 2; 1/3600; .5; 0.4/3600;...
-    0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; 0.4/3600;...
-    100; 1; 10; 2];
 figure
 conversionFactors = [1/3600, 1, 3600, 1, 3600, 3600, 1/3600, 1, 3600, 1, 3600,...
     3600, 1, 1, 3600, 1, 1, 1, 1, 3600, 1, 1, 3600, 1, 1, 1, 1, 1, 3600,...
-    1, 1, 1, 1];
+    1, 1, 1, 1, 1];
 for i = 1:length(paramMap)
-    subplot(3,9,i)
+    subplot(4,7,i)
     paramNum = i;
-    curSamples = myBayesianAnalysis.Results.Sample(end,paramNum,:);
-    [pdfCur, pCur] = ksdensity(curSamples(:)*p0(paramMap(paramNum))*conversionFactors(paramMap(paramNum)),...
-        'Support','positive','BoundaryCorrection','reflection');
-    plot(pCur, pdfCur)
-    % hold on
+    curSamples = myBayesianAnalysis.Results.Sample(1000:end,paramNum,:);
+    curMagn = p0(paramMap(paramNum))*conversionFactors(paramMap(paramNum));
+    %xi = linspace(min(curSamples(:)),max(curSamples(:)),20)*p0(paramMap(paramNum))*conversionFactors(paramMap(paramNum)),...
+    if paramMap(i)==1 || paramMap(i)==7
+        [pdfCur, pCur] = ksdensity(curSamples(:)*curMagn,...
+            'Support','positive','BoundaryCorrection','reflection','Bandwidth',curMagn*.06);
+    else
+        [pdfCur, pCur] = ksdensity(curSamples(:)*curMagn,...
+            'Support','positive','BoundaryCorrection','reflection','Bandwidth',curMagn*.2);
+    end
+    plot(pCur, pdfCur*curMagn,'LineWidth',1)
+    % histogram(curSamples(:),100)
+    hold on
+    % curSamplesEnd = myBayesianAnalysis.Results.Sample(end,paramNum,:);
+    % [pdfCur, pCur] = ksdensity(curSamplesEnd(:)*p0(paramMap(paramNum))*conversionFactors(paramMap(paramNum)),...
+    %     'Support','positive','BoundaryCorrection','reflection');
+    % plot(pCur, pdfCur,'LineWidth',1)
+    % curSamples4000 = myBayesianAnalysis4000.Results.Sample(:,paramNum,:);
+    % [pdfCur4000, pCur4000] = ksdensity(curSamples4000(:)*p0(paramMap(paramNum))*conversionFactors(paramMap(paramNum)),...
+    %     'Support','positive','BoundaryCorrection','reflection');
+    % plot(pCur4000, pdfCur4000,'LineWidth',1)
     % pPSOCur = pSolPSO(paramMap(paramNum))*conversionFactors(paramMap(paramNum));
     % plot([pPSOCur pPSOCur], [0, max(pdfCur)])
     xlabel(paramNames(paramMap(paramNum)))
+    prettyGraph
 end
 
 %% sample from MCMC samples
 samples = myBayesianAnalysis.Results.Sample(1001:end,:,:);
+p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
+    0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
+    100; 1; 10; 2; 2];
 numParam = size(samples,2);
-numSamplesNew = 400;
-popParam = ones(numSamplesNew, 33);
-fixedParam = [1, 2, 7, 8, 14, 17, 22, 25];
+numSamplesNew = 1000;
+popParam = ones(numSamplesNew, 34);
+fixedParam = [2, 8, 14, 17, 22, 25];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
-p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 6*3600; 2; 1/3600; .5; 0.4/3600;...
-    0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; 0.4/3600;...
-    100; 1; 10; 2];
 flatSamples = zeros(numParam, size(samples,1)*size(samples,3));
 for i = 1:size(samples,1)
     flatSamples(:,size(samples,3)*(i-1)+1:size(samples,3)*i) = samples(i,:,:);
@@ -198,7 +236,7 @@ for i = 1:numSamplesNew
 end
 uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP')
 modeVals = myBayesianAnalysis.Results.PostProc.PointEstimate.X{1};
-pSolMAP = ones(1, 33);
+pSolMAP = ones(1, 34);
 pSolMAP(varyLogic) = modeVals;
 popParam = [popParam; pSolMAP];
 % for i = 1:numParam
@@ -255,7 +293,7 @@ FibroblastJasAmpl(1,:) = [meanFibroblastControlAmpl, stdFibroblastControlAmpl];
 %% Compare stiffness data
 paramMat = popParam;
 expDataCell = {FibroblastStiffnessPeriod, FibroblastStiffnessAmpl};
-stiffnessTests = [logspace(0, 7, 20)];
+stiffnessTests = [logspace(0, 7, 30)];
 testsMat = zeros(5,length(stiffnessTests));
 testsMat(1,:) = stiffnessTests;
 expStiffness = [1e7, 300, 19];
@@ -267,7 +305,7 @@ legendEntries = {'Control (glass)','300 kPa PEKK scaffold','19 kPa PCL scaffold'
 % Compare ROCK data
 paramMat = popParam;
 expDataCell = {FibroblastROCKInhibPeriod, FibroblastROCKInhibAmpl};
-ROCKInhibTests = 0:2:30;
+ROCKInhibTests = 0:30;
 testsMat = zeros(5,length(ROCKInhibTests));
 testsMat(1,:) = 1e7;
 testsMat(2,:) = ROCKInhibTests;
@@ -281,7 +319,7 @@ legendEntries = {'Control','10uM Y27632','20uM Y27632'};
 % CytD Tests
 paramMat = popParam;
 expDataCell = {FibroblastCytDPeriod, FibroblastCytDAmpl};
-CytDTests = 0:.5:6;
+CytDTests = 0:.25:6;
 testsMat = zeros(5,length(CytDTests));
 testsMat(1,:) = 1e7;
 testsMat(3,:) = CytDTests;
@@ -292,10 +330,10 @@ plotDynMat(3,:) = FibroblastCytD;
 legendEntries = {'Control','1uM CytD','2uM CytD','5uM CytD'};
 [periodCytD, amplCytD] = plotConditions(paramMat, testsMat, plotDynMat, expDataCell, legendEntries);
 
-%% LatB Tests
+% LatB Tests
 paramMat = popParam;
 expDataCell = {FibroblastLatBPeriod, FibroblastLatBAmpl};
-LatBTests = 0:.25:2.5;
+LatBTests = 0:.1:2.5;
 testsMat = zeros(5,length(LatBTests));
 testsMat(1,:) = 1e7;
 testsMat(4,:) = LatBTests;
@@ -335,37 +373,29 @@ xlabelCell = {'Substrate stiffness (kPa)', 'Y27632 concentration (uM)',...
 for i = 1:length(testsCell)
     subplot(2,5,i)
     zeroVec = zeros(length(testsCell{i}),1);
-    avgPeriod = zeroVec; upperBarPeriod = zeroVec; lowerBarPeriod = zeroVec;
-    avgAmpl = zeroVec; upperBarAmpl = zeroVec; lowerBarAmpl = zeroVec;
-    modePeriod = zeroVec; modeAmpl = zeroVec;
+    % avgPeriod = zeroVec; upperBarPeriod = zeroVec; lowerBarPeriod = zeroVec;
+    % avgAmpl = zeroVec; upperBarAmpl = zeroVec; lowerBarAmpl = zeroVec;
+    % modePeriod = zeroVec; modeAmpl = zeroVec;
     if i == 1
-        normAmpl = median(amplCell{i}{end});
+        normAmpl = median(amplCell{i}(end,1:end-1));
     else
-        normAmpl = median(amplCell{i}{1});
+        normAmpl = median(amplCell{i}(1,1:end-1));
     end
-    for j = 1:length(periodCell{i})
-        periodPercentiles = prctile(periodCell{i}{j}(1:end-1),[25,50,75]);
-        avgPeriod(j) = periodPercentiles(2);%median(periodStiffness{i});
-        upperBarPeriod(j) = periodPercentiles(3) - avgPeriod(j);
-        lowerBarPeriod(j) = avgPeriod(j) - periodPercentiles(1);
-        modePeriod(j) = periodCell{i}{j}(end);
-        amplPercentiles = prctile(amplCell{i}{j}(1:end-1)/normAmpl,[25,50,75]);
-        avgAmpl(j) = amplPercentiles(2);%median(amplStiffness{i});
-        upperBarAmpl(j) = amplPercentiles(3) - avgAmpl(j);
-        lowerBarAmpl(j) = avgAmpl(j) - amplPercentiles(1);
-        if i==1
-            modeAmpl(j) = amplCell{i}{j}(end)/amplCell{i}{end}(end);
-        else
-            modeAmpl(j) = amplCell{i}{j}(end)/amplCell{i}{1}(end);
-        end
+    modePeriod = periodCell{i}(:,end);
+    if i==1
+        modeAmpl = amplCell{i}(:,end)/amplCell{i}(end,end);
+    else
+        modeAmpl = amplCell{i}(:,end)/amplCell{i}(1,end);
     end
-    if length(periodCell{i}{1})==1
+    if size(periodCell{i},1)==1
         plot(testsCell{i}, avgPeriod/3600, 'Color', 'b', 'LineWidth', 1)
     else
-        errorbar(testsCell{i}, avgPeriod/3600, lowerBarPeriod/3600,...
-            upperBarPeriod/3600, 'Color', 'b', 'LineWidth', .5)
+        % prctilePlot(testsCell{i}, periodCell{i}(:,1:end-1)/3600)
         hold on
-        plot(testsCell{i}, modePeriod/3600, 'Color', [0 0 .4], 'LineWidth', 2)
+        % plot(testsCell{i}, modePeriod/3600, 'Color', [0 0 .4], 'LineWidth', 2)
+        for k = 1:4:size(periodCell{i},2)
+            plot(testsCell{i}, periodCell{i}(:,k)/3600,'LineWidth',.2,'Color',[0,0,1,0.1])
+        end
     end
     if i==1
         set(gca,'XScale','log')
@@ -380,18 +410,20 @@ for i = 1:length(testsCell)
     xlabel(xlabelCell{i})
     ylabel('Period (hr)')
     if i==1
-        legend('Estimated parameter distribution', 'Maximum likelihood parameter set', 'Experiments')
+        legend('Estimated parameter distribution','','', '','', 'Experiments')
     end
-    ylim([21.8 27])
+    ylim([20 27.5])
     prettyGraph
     subplot(2,5,5+i);
-    if length(periodCell{i}{1})==1
-        plot(testsCell{i}, avgAmpl, 'Color', 'b', 'LineWidth', 1)
+    if size(periodCell{i},1)==1
+        plot(testsCell{i}, avgAmpl/normAmpl, 'Color', 'b', 'LineWidth', 1)
     else
-        errorbar(testsCell{i}, avgAmpl, lowerBarAmpl,...
-            upperBarAmpl, 'Color', 'b', 'LineWidth', .5)
+        % prctilePlot(testsCell{i}, amplCell{i}(:,1:end-1)/normAmpl)
         hold on
-        plot(testsCell{i}, modeAmpl, 'Color', [0 0 .4], 'LineWidth', 2)
+        % plot(testsCell{i}, modeAmpl, 'Color', [0 0 .4], 'LineWidth', 2)
+        for k = 1:4:size(amplCell{i},2)
+            plot(testsCell{i}, amplCell{i}(:,k)/normAmpl,'LineWidth',.2,'Color',[0,0,1,0.1])
+        end
     end
     if i==1
         set(gca,'XScale','log')
@@ -406,6 +438,32 @@ for i = 1:length(testsCell)
     xlabel(xlabelCell{i})
     ylabel('Normalized amplitude')
     % legend('Model','Experiments')
+    prettyGraph
+    ylim([0 5.5])
+    % set(gca,'YScale','log')
+end
+
+%% period summary with spaghetti plots
+figure
+for i = 1:length(testsCell)
+    subplot(1,5,i)
+    hold on
+    zeroVec = zeros(length(testsCell{i}),1);
+    for k = 1:4:size(periodCell{i},2)
+        plot(testsCell{i}, periodCell{i}(:,k)/3600,'Color',[0,0,1,0.1],'LineWidth',.2)
+    end
+    if i==1
+        set(gca,'XScale','log')
+        xlim([min(testsCell{i}), max(testsCell{i})])
+    else
+        xlim([-.05*max(testsCell{i}), max(testsCell{i})])
+    end
+    errorbar(expCasesCell{i}, expPeriodCell{i}(:,1),...
+        expPeriodCell{i}(:,2), expPeriodCell{i}(:,2),...
+        'LineStyle','none','LineWidth',1,'Marker','s','Color','r','LineWidth',1.5)
+    xlabel(xlabelCell{i})
+    ylabel('Period (hr)')
+    ylim([22 28])
     prettyGraph
 end
 
@@ -595,10 +653,10 @@ function logLikelihood = mechanoCircadian_logLikelihoodDyn(p, y)
     % order of tests: diff stiffness, ROCK inhibitor, CytoD, Latrunculin B,
     % Jas
     dataVec = y.dataVec;
-    p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 6*3600; 2; 1/3600; .5; 0.4/3600;...
-        0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; 0.4/3600;...
-        100; 1; 10; 2];
-    fixedParam = [1, 2, 7, 8, 14, 17, 22, 25];
+    p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
+        0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
+        100; 1; 10; 2; 2];
+    fixedParam = [2, 8, 14, 17, 22, 25];
     varyLogic = true(length(p0),1);
     varyLogic(fixedParam) = false;
     logLikelihood = zeros(size(p,1),1);
@@ -655,6 +713,7 @@ function logLikelihood = mechanoCircadian_logLikelihoodDyn(p, y)
             end
         end
         amplTest([4,7,11,14]) = amplTest(1); % all control cases
+        minVals([4,7,11,14]) = minVals(1);
         amplTestRaw = amplTest;
         % amplTest = amplTest/amplTest(1); % normalize to control amplitude
         modelStored{4} = modelStored{1};
@@ -671,6 +730,7 @@ function logLikelihood = mechanoCircadian_logLikelihoodDyn(p, y)
             tTest = modelStored{i}(:,1);
             curMeanDyn = expMeanDyn(i,1:length(tTest))';
             curStdDyn = expStdDyn(i,1:length(tTest))';
+            % curMeanDyn = curMeanDyn - min(curMeanDyn-curStdDyn);
             useLogic = curStdDyn > 0; % in certain cases, this may be zero
             logLikelihood(k) = logLikelihood(k) - sum(((yNormalized(useLogic) - curMeanDyn(useLogic))./curStdDyn(useLogic)).^2);
             % subplot(2,9,i)
@@ -679,6 +739,7 @@ function logLikelihood = mechanoCircadian_logLikelihoodDyn(p, y)
             % hold on
             % errorbar(tTest/(24*3600), curMeanDyn, curStdDyn, curStdDyn)
         end
+        % close(gcf)
         % if (meanP/meanB) > 2
         %     logLikelihood(k) = logLikelihood(k) - (meanP/meanB - 2)^2;
         % elseif (meanP/meanB) < 0.5
@@ -687,102 +748,25 @@ function logLikelihood = mechanoCircadian_logLikelihoodDyn(p, y)
     end
 end
 
-function logLikelihood = mechanoCircadian_logLikelihoodPeriod(p, y)
-%     maxTime = 3600*360;
-    % order of tests: diff stiffness, ROCK inhibitor, CytoD, Latrunculin B,
-    % Jas
-    dataVec = y.dataVec;
-    p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 6*3600; 2; 1/3600; .5; 0.4/3600;...
-        0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; 0.4/3600];
-    fixedParam = [2, 8, 14, 17, 22, 25];
-    varyLogic = true(length(p0),1);
-    varyLogic(fixedParam) = false;
-    logLikelihood = zeros(size(p,1),1);
-    stiffnessTests = [1e7, 300, 19,...
-        1e7, 1e7, 1e7,...
-        1e7, 1e7, 1e7, 1e7,...
-        1e7, 1e7, 1e7,...
-        1e7, 1e7, 1e7, 1e7];
-    ROCKInhibTests = [0, 0,  0,...
-        0, 10, 20,...
-        0, 0,  0, 0,...
-        0, 0,  0,...
-        0, 0,  0, 0];
-    CytDTests = [0, 0,  0,...
-        0, 10, 20,...
-        0, 1, 2, 5,...
-        0, 0, 0,...
-        0, 0, 0, 0];
-    LatBTests = [0, 0, 0,...
-        0, 0, 0,...
-        0, 0, 0, 0,...
-        0, 1, 2,...
-        0, 0, 0, 0];
-    JasTests = [0, 0, 0,...
-        0, 0, 0,...
-        0, 0, 0, 0,...
-        0, 0, 0,...
-        0, 0.1, 0.2, 0.5];
-    expMeanPeriod = dataVec(1:length(JasTests), 1);
-    expStdPeriod = dataVec(length(JasTests)+1:end, 1);
-    expMeanAmpl = dataVec(1:length(JasTests), 2);
-    expStdAmpl = dataVec(length(JasTests)+1:end, 2);
-    for k = 1:size(p,1)
-        meanP = [];
-        meanB = [];
-        pCur = p0;
-        pCur(varyLogic) = p(k,:).*pCur(varyLogic)';
-        amplTest = zeros(size(JasTests));
-        periodTest = zeros(size(JasTests));
-        modelCases = [1, 2, 3, 5, 6, 8, 9, 10, 12, 13, 15, 16, 17]; % only non-repeats in conditions
-        modelStored = cell(size(JasTests));
-        minVals = zeros(size(JasTests));
-        for i = modelCases
-            ROCKLevel =  1 / (1 + (ROCKInhibTests(i)/pCur(18)));
-            kra_cur = 1 / (1 + (LatBTests(i)/pCur(26))) + (1 + pCur(27))*JasTests(i) / pCur(28);
-            inhibVec = [kra_cur, ROCKLevel, 1, 1, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD]
-            [periodCur, amplCur, t, y] = conditionToOutputs(pCur, stiffnessTests(i), inhibVec);
-            amplTest(i) = amplCur(3);
-            periodTest(i) = periodCur(3);
-            oscDynamics = y(:,3);
-            modelStored{i} = [t, oscDynamics];
-            minVals(i) = min(oscDynamics);
-            if i == 1
-                meanP = trapz(t, y(:,2))/range(t);
-                meanB = trapz(t, y(:,1))/range(t);
-            end
-        end
-        amplTest([4,7,11,14]) = amplTest(1); % all control cases
-        amplTest = amplTest/amplTest(1);
-        periodTest([4,7,11,14]) = periodTest(1); % all control cases
-        periodTest = periodTest/3600;   
-        logLikelihood(k) = -sum(((periodTest'-expMeanPeriod)./expStdPeriod).^2) -...
-            0.1*sum(((amplTest'-expMeanAmpl)./expStdAmpl).^2);
-        if (meanP/meanB) > 2
-            logLikelihood(k) = logLikelihood(k) - (meanP/meanB - 2)^2;
-        elseif (meanP/meanB) < 0.5
-            logLikelihood(k) = logLikelihood(k) - (meanB/meanP - 2)^2;
-        end
-    end
-end
-
 function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMat, expDataCell, legendEntries)
 % testsMat has numTests columns and 6 rows: stiffness, ROCK inhib, CytD, LatB, Jas
 % plotDynMat has similar structure, but contains entries to plot (number of
 % curves given by number of columns in the matrix)
     
-    periodTests = cell(size(testsMat,2),1);
-    amplTests = cell(size(testsMat,2),1);
-    for k = 1:size(paramMat,1)
+    numTests = size(testsMat,2);
+    numSamples = size(paramMat,1);
+    periodTests = zeros(numTests,numSamples);
+    amplTests = zeros(numTests,numSamples);
+    for k = 1:numSamples
         pCur= paramMat(k,:);
-        for i = 1:size(testsMat,2)
+        for i = 1:numTests
             ROCKLevel =  1 / (1 + (testsMat(2,i)/pCur(18)));
             kra_cur = 1 / (1 + (testsMat(4,i)/pCur(26))) +...
                 (1 + pCur(27))*testsMat(5,i)/pCur(28);
             inhibVec = [kra_cur, ROCKLevel, 1, 1, testsMat(3,i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD] 
-            [curPeriod, curAmpl] = conditionToOutputs(pCur, testsMat(1,i), inhibVec, 3600*480);
-            periodTests{i}(k) = curPeriod(3);
-            amplTests{i}(k) = curAmpl(3);
+            [curPeriod, curAmpl] = conditionToOutputs(pCur, testsMat(1,i), inhibVec, 3600*24*7);
+            periodTests(i,k) = curPeriod(3);
+            amplTests(i,k) = curAmpl(3);
         end
     end
 
@@ -792,7 +776,7 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
     ylabel('PER:Luc luminescence (au)')
     prettyGraph
     hold on
-    oscDynamics = cell(size(plotDynMat,2));
+    oscDynamics = cell(size(plotDynMat,2),1);
     % figure
     for k = 1:size(paramMat,1)
         pCur= paramMat(k,:);
@@ -801,7 +785,7 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
             kra_cur = 1 / (1 + (plotDynMat(4,i)/pCur(26))) +...
                 (1+pCur(27))*plotDynMat(5,i) / pCur(28);
             inhibVec = [kra_cur, ROCKLevel, 1, 1, plotDynMat(3,i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD] 
-            [~, ~, t, y] = conditionToOutputs(pCur, plotDynMat(1,i), inhibVec, 3600*480);
+            [~, ~, t, y] = conditionToOutputs(pCur, plotDynMat(1,i), inhibVec, 3600*10*24);
             storeLogic = t <= 24*5*3600;
             oscDynamics{i}(k,:) = y(storeLogic,3);
             % plot(t,y(:,3))
@@ -813,36 +797,24 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
     meanDyn = zeros(size(plotDynMat,2),length(tStored));
     stdDyn = zeros(size(plotDynMat,2),length(tStored));
     popLogic = size(paramMat,1) > 1;
+    colororder = linspecer(size(plotDynMat,2));
     for i = 1:size(plotDynMat,2)
-        meanDyn(i,:) = mean(oscDynamics{i}(1:end-1,:),1);
         if ~popLogic
-            plot(tStored/(24*3600), meanDyn(i,:),'LineWidth',1)
+            plot(tStored/(24*3600), oscDynamics{i},'LineWidth',1)
         else
+            meanDyn(i,:) = mean(oscDynamics{i}(1:end-1,:),1);
             stdDyn(i,:) = std(oscDynamics{i}(1:end-1,:),1)/sqrt(size(oscDynamics{i},1));
-            errorbar(tStored/(24*3600), meanDyn(i,:), stdDyn(i,:), stdDyn(i,:))
+            % errorbar(tStored/(24*3600), meanDyn(i,:), stdDyn(i,:), stdDyn(i,:))
+            % prctilePlot(tStored'/(24*3600), oscDynamics{i}(1:end-1,:)')
+            for k = 1:size(oscDynamics{i},1)-1
+                plot(tStored/(24*3600), oscDynamics{i}(k,:),'Color',[colororder(i,:),0.1])
+            end
         end
     end
+    set(gca,'YScale','log')
     xlim([0 5])
-    legend(legendEntries)
+    % legend(legendEntries)
 
-    avgPeriod = zeros(size(testsMat,2),1);
-    upperBarPeriod = zeros(size(testsMat,2),1);
-    lowerBarPeriod = zeros(size(testsMat,2),1);
-    avgAmpl = zeros(size(testsMat,2),1);
-    upperBarAmpl = zeros(size(testsMat,2),1);
-    lowerBarAmpl = zeros(size(testsMat,2),1);
-    for i = 1:size(testsMat,2)
-        periodPercentiles = prctile(periodTests{i}(1:end-1),[25,50,75]);
-        avgPeriod(i) = periodTests{i}(end);%median(periodStiffness{i});
-        % stdPeriod(i) = std(periodStiffness{i})/sqrt(length(periodStiffness{i}));
-        upperBarPeriod(i) = periodPercentiles(3) - avgPeriod(i);
-        lowerBarPeriod(i) = avgPeriod(i) - periodPercentiles(1);
-        amplPercentiles = prctile(amplTests{i}(1:end-1),[25,50,75]);
-        avgAmpl(i) = amplTests{i}(end);%median(amplStiffness{i});
-        % stdAmpl(i) = std(amplStiffness{i})/sqrt(length(periodStiffness{i}));
-        upperBarAmpl(i) = amplPercentiles(3) - avgAmpl(i);
-        lowerBarAmpl(i) = avgAmpl(i) - amplPercentiles(1);
-    end
     sp1 = subplot(1,3,1);
     activeTestsLogic = false(size(testsMat,1),1);
     for i = 1:size(testsMat,1)
@@ -866,10 +838,9 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
         xlabelString = 'Test number';
     end
     if ~popLogic
-        plot(testsVec, avgPeriod/3600, 'Color', 'b', 'LineWidth', 1)
+        plot(testsVec, periodTests/3600, 'Color', 'b', 'LineWidth', 1)
     else
-        errorbar(testsVec, avgPeriod/3600, lowerBarPeriod/3600, upperBarPeriod/3600,...
-            'Color', 'b', 'LineWidth', 1)
+        prctilePlot(testsVec, periodTests(:,1:end-1)/3600)
     end
     if xlog
         set(gca, 'XScale', 'log')
@@ -885,10 +856,9 @@ function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMa
     prettyGraph
     sp2 = subplot(1,3,2);
     if ~popLogic
-        plot(testsVec, avgAmpl/avgAmpl(controlIdx), 'Color', 'b', 'LineWidth', 1)
+        plot(testsVec, amplTests/amplTests(controlIdx), 'Color', 'b', 'LineWidth', 1)
     else
-        errorbar(testsVec, avgAmpl/avgAmpl(controlIdx), lowerBarAmpl/avgAmpl(controlIdx),...
-            upperBarAmpl/avgAmpl(controlIdx), 'Color', 'b', 'LineWidth', 1)
+        prctilePlot(testsVec, amplTests(:,1:end-1)/median(amplTests(controlIdx,1:end-1)))
     end
     if xlog
         set(gca, 'XScale', 'log')

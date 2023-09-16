@@ -1,4 +1,4 @@
-function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
+function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol)
     param = [
         0.648;		% param(1) is 'krp'
         0.14;		% param(2) is 'kNC'
@@ -77,7 +77,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         0.0;		% param(75) is 'Kr_r7'
         0.0;		% param(76) is 'Kr_r6'
         0.0;		% param(77) is 'Kr_r5'
-        MRTFParam(8);%3.25;		% param(78) is 'C'
+        pSol(19);%3.25;		% param(78) is 'C'
         0.0;		% param(79) is 'Kr_r4'
         0.0;		% param(80) is 'Kr_r3
         0.0;		% param(81) is 'Kr_r2'
@@ -122,11 +122,11 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
     end
     % MRTF parameters (124:128)
     param(124) = 1e6;%MRTFParam(1); %MRTFTot;
-    param(125) = MRTFParam(1); %Kinsolo_MRTF;
-    param(126) = MRTFParam(2); %Kin2_MRTF;
-    param(127) = MRTFParam(3); %MRTFReleaseConst
-    param(128) = MRTFParam(4); %Kcap (CytoD)
-    param(129) = MRTFParam(5); %Kdim (CytoD)
+    param(125) = pSol(31); %Kinsolo_MRTF;
+    param(126) = pSol(32); %Kin2_MRTF;
+    param(127) = pSol(30); %MRTFReleaseConst
+    param(128) = pSol(18); %Kcap (CytoD)
+    param(129) = pSol(33); %Kdim (CytoD)
 
     p = param;
 
