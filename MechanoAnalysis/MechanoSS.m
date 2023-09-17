@@ -1,4 +1,42 @@
-function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
+function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
+    % function returning the steady state state variable values for YAP/TAZ
+    % and MRTF mechanotransduction model (developed from VCell)
+
+    % inputs:
+    %     stiffnessParam is a 2 element vector with the stiffness in kPa (first
+    %       element) and the time scale of stiffness increase in s (second el)
+    %       only stiffnessParam(1) is used here (stiffness is assumed to be
+    %       equal to this value at SS)
+    %
+    %     inhibVec: vector of inhibition parameters (length=9)
+    %       1: actin polym inhibition: factor multiplying kra
+    %       2: ROCK inhibition: factor multiplying param 55, 69 (epsilon and tau - ROCK mediated catalysis)
+    %       3: MRTF-Circadian coupling inhibition (not used here)
+    %       4: YAP overexpression - fold expression of 5SA-YAP (compared to normal YAP expression)
+    %       5: CytD concentration (in micromolar)
+    %       6: LATS factor - factor multiplying kNC (rate of YAP phosphorylation)
+    %       7: blebbistatin - factor multiplying param(46) (rate of stress fiber dependent YAPTAZ
+    %           dephos) and param(86) (rate of stress fiber-dependent nuclear pore opening)
+    %       8: cell contact area (in microns squared, control area is 3000)
+    %       9: lamin A mutation - factor multiplying lamin A phos rate (krl)
+    %
+    %     pSol: parameter solution vector (see full list in
+    %     MechanoCircadianModel function)
+    %
+    %     popVar (optional) - either length of 105 (total # of parameters
+    %     to vary) or scalar corresponding to population variance
+    %
+    %
+    % Outputs:
+    %   SSVar: SS values for all state variables
+    %   tauVals: characteristic time scale computed for each variable
+
+    if isempty(varargin)
+        popVar = 0;
+    elseif length(varargin)==1
+        popVar = varargin{1};
+    end
+
     param = [
         0.648;		% param(1) is 'krp'
         0.14;		% param(2) is 'kNC'
@@ -51,7 +89,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         300.0;		% param(49) is 'mlabfix_T_'
         0.8;		% param(50) is 'mDia_init_uM'
         1000.0;		% param(51) is 'K_millivolts_per_volt'
-        0.001;		% param(52) is 'Kr_r15'
+        0.001;		% param(52) is 'krl'
         0.0;		% param(53) is 'Kr_r12'
         100.0;		% param(54) is 'Clamin'
         36.0;		% param(55) is 'epsilon'
@@ -59,7 +97,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         17.9;		% param(57) is 'Fcyto_init_uM'
         0.3;		% param(58) is 'ROCKB'
         482.4;		% param(59) is 'Gactin_init_uM'
-        1260.0;		% param(60) is 'Size_PM'
+        1080.0;		% param(60) is 'Size_PM'
         0.1;		% param(61) is 'LIMKA_init_uM'
         550.0;		% param(62) is 'Size_Nuc'
         10.0;		% param(63) is 'kin2'
@@ -77,9 +115,9 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         0.0;		% param(75) is 'Kr_r7'
         0.0;		% param(76) is 'Kr_r6'
         0.0;		% param(77) is 'Kr_r5'
-        10;%3.25;		% param(78) is 'C'
+        3.25;		% param(78) is 'C'
         0.0;		% param(79) is 'Kr_r4'
-        0.0;		% param(80) is 'Kr_r3'
+        0.0;		% param(80) is 'Kr_r3
         0.0;		% param(81) is 'Kr_r2'
         0.0;		% param(82) is 'Kr_r1'
         0.0;		% param(83) is 'Kr_r0'
@@ -105,29 +143,41 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         0.001660538783162726;		% param(103) is 'KMOLE'
         ];
     
-    param(17) = stiffnessParam(1);
-    param(104) = stiffnessParam(2);
-
-    % load inhibition parameters [actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), cytD]
+    param(17) = stiffnessParam(1); % substrate stiffness
+    param(104) = stiffnessParam(2); % unused
+    param(78) = pSol(19); % substrate stiffness sensitivity (C)
+    
+    % load inhibition parameters 
+    % [actin polym (kra), ROCK, MRTF, YAP overexpression, cytD conc, LATS factor,...
+    % blebbistatin conc, contact area, Lamin A phos]
     param(3) = param(3)*inhibVec(1); % inhibition of actin polymerization
     param([55,69]) = param([55,69])*inhibVec(2); % inhibit ROCK-mediated catalysis
-    param(2) = param(2)*inhibVec(4); % inhibit YAP phosphorylation
-    if inhibVec(4)==0
-        param([4,56,98]) = 2*param([4,56,98]);
-    end
-    % if applicable, assess cytoD conc
-    param(123) = 0;
-    if length(inhibVec)>4
-        param(123) = inhibVec(5);
-    end
-    % MRTF parameters (124:128)
-    param(124) = MRTFParam(1); %MRTFTot;
-    param(125) = MRTFParam(2); %kinsolo_MRTF;
-    param(126) = MRTFParam(3); %kin2_MRTF;
-    param(127) = MRTFParam(4); %kout_MRTF;
-    param(128) = MRTFParam(5); %MRTFReleaseConst
-    param(129) = MRTFParam(6); %CytDConst
+    param(112) = inhibVec(4); % fold 5SA-YAP overexpression
+    param(105) = inhibVec(5); % cytD conc
+    param(2) = inhibVec(6)*param(2); % LATS factor (for changes in cell density)
+    param(86) = inhibVec(7)*param(86); % inhibit actin-myosin interactions (blebbistatin) - YAPTAZ dephos
+    param(46) = inhibVec(7)*param(46); % inhibit actin-myosin interactions (blebbistatin) - NPC opening
+    param([5,97]) = inhibVec(8)*param([5,97])/3000; % account for contact area
+    param(52) = inhibVec(9)*param(52); % inhibit phosph. of LaminA
+    
+    param(113) = pSol(30); %MRTFReleaseConst
+    param(106) = 1e6; %MRTFTot
+    param(107) = pSol(31); %Kinsolo_MRTF
+    param(108) = pSol(32); %Kin2_MRTF
+    param(109) = pSol(34); %Kcap (cytoD-dependent F actin capping rate)
+    param(110) = pSol(33); %Kdim (cytoD-dependent G actin dimerization rate)
 
+    % introduce variability in parameters (all rate constants and
+    % concentrations except calibrated MRTF parameters, those are sampled
+    % separately from their own distributions)
+    if length(popVar) == 105
+        varVecCur = popVar(1:105);
+        varVecCur = varVecCur(:);
+    else
+        varVecCur = sqrt(popVar).*randn(size(param([1:104,106])));
+    end
+    varVecCur([33:36,47:49,51,64,66,68,72,85,90:92,94,99:100,102:103]) = 0; % exclude constants and exponents
+    param([1:104,106]) = param([1:104,106]) .* exp(varVecCur);
     p = param;
 
 	% Constants
@@ -147,11 +197,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 	kdf = p(14);
 	krNPC = p(15);
 	ROCKA_init_uM = p(16);
-	if isinf(p(104))
-        Emol = p(17);
-    else
-        Emol = p(17)*t/p(104);
-    end
+    Emol = p(17);
 	kcatcof = p(18);
 	SAV = p(19);
 	kdrock = p(20);
@@ -160,34 +206,34 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 	Size_Cyto = p(23);
 	kdmdia = p(24);
 	alpha = p(25);
-	Size_ECM = p(26);
-	Voltage_PM = p(27);
+	% Size_ECM = p(26);
+	% Voltage_PM = p(27);
 	kmr = p(28);
 	gamma = p(29);
 	kmp = p(30);
 	CofilinNP_init_uM = p(31);
-	k11 = p(32);
-	netValence_r5 = p(33);
-	netValence_r4 = p(34);
-	netValence_r3 = p(35);
-	netValence_r1 = p(36);
+	% k11 = p(32);
+	% netValence_r5 = p(33);
+	% netValence_r4 = p(34);
+	% netValence_r3 = p(35);
+	% netValence_r1 = p(36);
 	kflaminA = p(37);
-	kly = p(38);
+	% kly = p(38);
 	Fakp_init_uM = p(39);
 	klr = p(40);
-	kll = p(41);
+	% kll = p(41);
 	LaminA_init_molecules_um_2 = p(42);
 	mDiaB = p(43);
-	Voltage_NM = p(44);
+	% Voltage_NM = p(44);
 	RhoAGTP_MEM_init_molecules_um_2 = p(45);
 	kfNPC = p(46);
-	mlabfix_F_nmol_ = p(47);
+	% mlabfix_F_nmol_ = p(47);
 	unitconversionfactor = p(48);
-	mlabfix_T_ = p(49);
+	% mlabfix_T_ = p(49);
 	mDia_init_uM = p(50);
-	K_millivolts_per_volt = p(51);
-	Kr_r15 = p(52);
-	Kr_r12 = p(53);
+	% K_millivolts_per_volt = p(51);
+	krl = p(52);
+	% Kr_r12 = p(53);
 	Clamin = p(54);
 	epsilon = p(55);
 	YAPTAZP_init_uM = p(56);
@@ -198,37 +244,37 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 	LIMKA_init_uM = p(61);
 	Size_Nuc = p(62);
 	kin2 = p(63);
-	mlabfix_PI_ = p(64);
+	% mlabfix_PI_ = p(64);
 	propStiff = p(65);
-	mlabfix_F_ = p(66);
+	% mlabfix_F_ = p(66);
 	kinSolo2 = p(67);
-	mlabfix_R_ = p(68);
+	% mlabfix_R_ = p(68);
 	tau = p(69);
 	kout2 = p(70);
 	ROCK_init_uM = p(71);
-	mlabfix_K_GHK_ = p(72);
+	% mlabfix_K_GHK_ = p(72);
 	kdep = p(73);
-	Size_NM = p(74);
-	Kr_r7 = p(75);
-	Kr_r6 = p(76);
-	Kr_r5 = p(77);
+	% Size_NM = p(74);
+	% Kr_r7 = p(75);
+	% Kr_r6 = p(76);
+	% Kr_r5 = p(77);
 	C = p(78);
-	Kr_r4 = p(79);
-	Kr_r3 = p(80);
-	Kr_r2 = p(81);
-	Kr_r1 = p(82);
-	Kr_r0 = p(83);
+	% Kr_r4 = p(79);
+	% Kr_r3 = p(80);
+	% Kr_r2 = p(81);
+	% Kr_r1 = p(82);
+	% Kr_r0 = p(83);
 	NPC_init_molecules_um_2 = p(84);
-	mlabfix_N_pmol_ = p(85);
+	% mlabfix_N_pmol_ = p(85);
 	kCY = p(86);
 	CofilinP_init_uM = p(87);
 	LaminAp_init_molecules_um_2 = p(88);
 	kCN = p(89);
-	netValence_r16 = p(90);
-	netValence_r15 = p(91);
-	netValence_r14 = p(92);
+	% netValence_r16 = p(90);
+	% netValence_r15 = p(91);
+	% netValence_r14 = p(92);
 	LIMK_init_uM = p(93);
-	netValence_r12 = p(94);
+	% netValence_r12 = p(94);
 	kturnover = p(95);
 	Fak_init_uM = p(96);
 	ksf = p(97);
@@ -236,21 +282,22 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 	n2 = p(99);
 	n1 = p(100);
 	NPCA_init_molecules_um_2 = p(101);
-	Positionboolean_init_molecules_um_2 = p(102);
-	KMOLE = p(103);
+	% Positionboolean_init_molecules_um_2 = p(102);
+	% KMOLE = p(103);
 	KFlux_PM_Cyto = (Size_PM ./ Size_Cyto);
-	KFlux_NM_Cyto = (Size_NM ./ Size_Cyto);
+	% KFlux_NM_Cyto = (Size_NM ./ Size_Cyto);
 	UnitFactor_uM_um3_molecules_neg_1 = (1000000.0 ./ 6.02214179E8);
 
-    cytoDConc = p(123);
-    MRTFTot = p(124);
-    kinsolo_MRTF = p(125);
-    kin2_MRTF  = p(126);
-    kout_MRTF = p(127);
-    MRTFReleaseConst = p(128);
-    cytoDConst = p(129);
+    cytoDConc = p(105);
+    MRTFTot = p(106);
+    Kinsolo_MRTF = p(107);
+    Kin2_MRTF  = p(108);
+    Kcap = p(109);
+    Kdim = p(110);
+    foldYAPOverexpress = p(112);
+    MRTFReleaseConst = p(113);
 	
-    %SS calcs (some analytical)
+    %SS calcs
     Faktot = Fak_init_uM + Fakp_init_uM;
     Fakp = Faktot * (ksf*Emol + kf *(C+Emol)) / ((kf+kdf)*(C + Emol) + ksf*Emol);
     Fak = Faktot - Fakp;
@@ -292,10 +339,11 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
     CofilinTau = (kturnover + kcatcof*LIMKA/kmCof)^(-1);
 
     ActinTot = Fcyto_init_uM + Gactin_init_uM;
+    kdep_tot = (kdep + kfc1*CofilinNP)*(1 + cytoDConc/Kdim);
     Fcyto = ActinTot*kra*(alpha*smoothmDiaA+1)...
-        /(kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/cytoDConst));
-    Gactin = ActinTot - Fcyto*(1+cytoDConc/cytoDConst);
-    ActinTau = (kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/cytoDConst))^(-1);
+        /(kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap));
+    Gactin = (ActinTot - Fcyto*(1+cytoDConc/Kcap))/(1 + cytoDConc/Kdim);
+    ActinTau = (kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap))^(-1);
 
     MyoTot = Myo_init_uM + MyoA_init_uM;
     MyoA = MyoTot*kmr*(epsilon*smoothROCKA+1)/(kdmy + kmr*(epsilon*smoothROCKA+1));
@@ -304,9 +352,9 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 
     Ecytosol = propStiff*(Fcyto^n1);
     LaminATot = LaminAp_init_molecules_um_2 + LaminA_init_molecules_um_2;
-    LaminA = LaminATot*kflaminA*Ecytosol/(kflaminA*Ecytosol + Kr_r15*(Clamin+Ecytosol));
+    LaminA = LaminATot*kflaminA*Ecytosol/(kflaminA*Ecytosol + krl*(Clamin+Ecytosol));
     LaminAp = LaminATot - LaminA;
-    LaminATau = (kflaminA*Ecytosol/(Clamin+Ecytosol) + Kr_r15)^(-1);
+    LaminATau = (kflaminA*Ecytosol/(Clamin+Ecytosol) + krl)^(-1);
 
     NPCTot = NPCA_init_molecules_um_2 + NPC_init_molecules_um_2;
     NPCA = NPCTot*kfNPC*LaminA*Fcyto*MyoA / (krNPC + kfNPC*LaminA*Fcyto*MyoA);
@@ -320,14 +368,23 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
         + YAPTAZnuc_init_uM*NucConvert);
     YAPTAZPFraction = (kNC/(kNC + kCN + kCY*Fcyto*MyoA)); % rapid phosphorylation
     YAPTAZnucFraction = (kinSolo2 + kin2*NPCA)/(kout2*Size_Cyto/Size_Nuc + kinSolo2 + kin2*NPCA);
-%     YAPTAZCytoTot = YAPTAZTot - YAPTAZnuc;
-%     YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
-%     YAPTAZN = YAPTAZCytoTot - YAPTAZP;
-%     YAPTAZNPTot = YAPTAZTot - YAPTAZP;
     YAPTAZCytoTot = YAPTAZTot / (1 + (1-YAPTAZPFraction)*YAPTAZnucFraction/(1-YAPTAZnucFraction));
     YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
     YAPTAZN = YAPTAZCytoTot - YAPTAZP;
     YAPTAZnuc = YAPTAZTot - YAPTAZCytoTot;
+    if foldYAPOverexpress > 0 % overexpression of YAP mutant
+        YAPTAZTot_5SA = YAPTAZTot*foldYAPOverexpress;
+        kNC_5SA = 0.1*kNC;
+        YAPTAZPFraction_5SA = (kNC_5SA/(kNC_5SA + kCN + kCY*Fcyto*MyoA)); % rapid phosphorylation
+        YAPTAZnucFraction_5SA = (kinSolo2 + kin2*NPCA)/(kout2*Size_Cyto/Size_Nuc + kinSolo2 + kin2*NPCA);
+        YAPTAZCytoTot_5SA = YAPTAZTot_5SA / (1 + (1-YAPTAZPFraction_5SA)*YAPTAZnucFraction_5SA/(1-YAPTAZnucFraction_5SA));
+        YAPTAZP_5SA = YAPTAZCytoTot_5SA * YAPTAZPFraction_5SA;
+        YAPTAZN_5SA = YAPTAZCytoTot_5SA - YAPTAZP_5SA;
+        YAPTAZnuc_5SA = YAPTAZTot_5SA - YAPTAZCytoTot_5SA;
+        YAPTAZP = YAPTAZP + YAPTAZP_5SA;
+        YAPTAZN = YAPTAZN + YAPTAZN_5SA;
+        YAPTAZnuc = YAPTAZnuc + YAPTAZnuc_5SA;
+    end
     YAPTAZN = YAPTAZN/CytoConvert;
     YAPTAZP = YAPTAZP/CytoConvert;
     YAPTAZnuc = YAPTAZnuc/NucConvert;
@@ -336,10 +393,10 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, MRTFParam)
 
     %MRTF
     MRTFFactor = 1/(1+(Gactin/MRTFReleaseConst)^2);
-    nucPerm_MRTF = kinsolo_MRTF + kin2_MRTF*NPCA;
-    MRTFnuc = (MRTFTot*nucPerm_MRTF*MRTFFactor/CytoConvert) / (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF);
+    nucPerm_MRTF = Kinsolo_MRTF + Kin2_MRTF*NPCA;
+    MRTFnuc = (MRTFTot*nucPerm_MRTF*MRTFFactor/CytoConvert) / (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + 1);
     MRTFcyto = (MRTFTot - MRTFnuc*NucConvert)/CytoConvert;
-    MRTFnucTau = (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + kout_MRTF)^(-1);
+    MRTFnucTau = (nucPerm_MRTF*MRTFFactor*NucConvert/CytoConvert + 1)^(-1);
 
 	SSVar = [CofilinP; Fak; mDia; LaminA; Fcyto; RhoAGTP_MEM; mDiaA; NPCA;...
         Gactin; NPC; ROCKA; Myo; CofilinNP; LaminAp; YAPTAZnuc; Fakp;...
