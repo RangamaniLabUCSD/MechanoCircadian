@@ -2,10 +2,10 @@
 MATLAB-based implementation of the coupling between the cell Circadian clock and mechanotransduction, associated with the manuscript by Emmet Francis and Padmini Rangamani, "Computational modeling predicts mechanotransduction-mediated changes to Circadian oscillations in mammalian cells".
 
 To run the code in this repository, you need to first install the following:
-* DDE-BIFTOOL (download code and add to path in MATLAB)
-* UQLab (download code and add to path in MATLAB)
-* violin (download code and add to path)
-* linspecer (download code and add to path)
+* DDE-BIFTOOL - https://sourceforge.net/projects/ddebiftool/ (download code and add to path in MATLAB)
+* UQLab - https://www.uqlab.com/download (download code and add to path in MATLAB)
+* Violinplot-MATLAB - https://github.com/bastibe/Violinplot-Matlab (download code and add to path)
+* linspecer - https://www.mathworks.com/matlabcentral/fileexchange/42673-beautiful-and-distinguishable-line-colors-colormap (download code and add to path)
 * Required MATLAB toolboxes: Communications Toolbox, Curve Fitting Toolbox, Global Optimization Toolbox, Optimization Toolbox, Signal Processing Toolbox, Statistics and Machine Learning Toolbox.
 
 Scripts used to generate the figures in the paper are organized into 5 main folders, "CircadianAnalysisAndBifurcation" (Fig 3, Fig S4), "MechanoAnalysis" (Fig 1B, Fig S3), "SensitivityAndFitting" (Fig 2, Fig S1, Fig S2), and "MechanoCircadian" (Fig 1B-C, Fig 4, Fig 5, Fig S5). We break down the associated files below.
