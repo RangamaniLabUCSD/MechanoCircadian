@@ -1,3 +1,4 @@
+%% Driver script for MechanoCircadian model sensitivity analysis using UQLab
 clearvars
 rng(100,'twister')
 uqlab
@@ -10,41 +11,7 @@ paramNames = {'tauB','nB','KeB0','KiB','KdBP','KdB',...
               'KeP2,Y','KYP','nYP','KeB2,M','KMB','nMB',...
               'LatBSens','JasMag','JasSens','KdLuc',...
               'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap'};
-% tauB = p(1);     1
-% pExpB = p(2);     
-% KeB = p(3);       2
-% KiB = p(4);       3
-% KdBP = p(5);      4
-% KdB = p(6);       5
-% tauP = p(7);     6
-% pExpP = p(8);     
-% KeP = p(9);       7
-% KaP = p(10);      8
-% KdP = p(11);      9
-% magCouple1 = p(12);10
-% KdCouple1 = p(13);11
-% nCouple1 = p(14);-
-% magCouple2 = p(15);12
-% KdCouple2 = p(16);13
-% nCouple2 = p(17);-
-% % p(18) is ROCKInhibSens
-% C = p(19);%stiffness shift 14
-% 20: magCouple3    15
-% 21: KdCouple3     16
-% 22: nCouple3      
-% 23: magCouple4    17
-% 24: KdCouple4     18
-% 25: nCouple4
-% 26: LatB const
-% 27: Jasp mag const
-% 28: Jasp sens const
-% 29: KdLuc         19
-% 30: MRTFRelease   20
-% 31: KinsoloMRTF   21
-% 32: Kin2MRTF      22
-% 33: Kdim
-% 34: Kcap
-activeIdx = [1,3:7,9:13, 15,16,19,20,21,23,24,29,30,31,32];
+activeIdx = [1,3:7,9:13, 15,16,19,20,21,23,24,29,30,31,32]; % exclude Hill coefficients and parameters associated with inhibitor treatments
 paramNames = paramNames(activeIdx);
 numParam = 22;
 for i = 1:numParam
@@ -64,16 +31,10 @@ SobolOpts.Bootstrap.Replications = 100;
 SobolOpts.Bootstrap.Alpha = 0.05;
 SobolAnalysis = uq_createAnalysis(SobolOpts);
 save('SobolAnalysisNew_1000_newLucDecay.mat','SobolAnalysis')
-% MorrisSensOpts.Type = 'Sensitivity';
-% MorrisSensOpts.Method = 'Morris';
-% MorrisSensOpts.Morris.Cost = 1e4;
-% MorrisAnalysis = uq_createAnalysis(MorrisSensOpts);
-
-%% display
+% display
 uq_visualizeSobolIndices(SobolAnalysis.Results, [3, 6])
-% uq_display(MorrisAnalysis)
 
-%% customized plot
+%% customized plot for Figure 3
 plotIdx = 6;
 curColor = 'r';
 figure

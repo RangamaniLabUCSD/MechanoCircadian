@@ -1,6 +1,18 @@
 function [period, ampl, decayRate, pkLocs] = circOscAnalysis(t, oscDynamics)
-    %UNTITLED Summary of this function goes here
-    %   Detailed explanation goes here
+    % function for computing oscillation period, amplitude, and decay rate
+    % for MechanoCircadian model
+
+    % INPUTS:
+%       * t: time vector
+%       * oscDynamics: vector storing values for variable of interest
+
+    % OUTPUTS:
+%       * period: oscillation period
+%       * ampl: oscillation amplitude
+%       * decayRate: oscillation decay rate (essentially, the rate of
+%       change in amplitude)
+%       * pkLocs: locations of peaks, given in terms of indices
+
     maxTime = max(t);
     [pks,locs] = findpeaks(oscDynamics,'MinPeakProminence',mean(oscDynamics)*1e-4);
     if length(pks) > 2
@@ -52,23 +64,6 @@ function [period, ampl, decayRate, pkLocs] = circOscAnalysis(t, oscDynamics)
             troughLocs(i) = idx + curTroughLoc - 1;
         end
     end
-    
-    % if length(pks)>2
-    %     % fit to decaying sinusoid
-    %     endFitIdx = find(tInterp <= tInterp(end)-periodEst/2, 1, 'last');
-    %     yFit = yInterp(pkLocs(2):endFitIdx);
-    %     tFit = tInterp(pkLocs(2):endFitIdx);
-    %     tFit = tFit - tFit(1);
-    %     cosFun = @(param,t) param(1)*exp(-t/param(2)).*cos(2*pi*t/param(3)) + param(4);
-    %     paramFit = lsqcurvefit(cosFun,[1,24*3600,24*3600,0],tFit,yFit');
-    %     ampl = paramFit(1);
-    %     decayRate = 1/paramFit(2);
-    %     period = paramFit(3);
-    % else
-    %     decayRate = -1;
-    %     period = 0;%t(end);
-    %     ampl = max(oscDynamics)-min(oscDynamics);
-    % end
 
     if length(pks)>2 && length(troughs)>2
         lastExtremum = min([length(pks),length(troughs)]); 
@@ -105,19 +100,4 @@ function [period, ampl, decayRate, pkLocs] = circOscAnalysis(t, oscDynamics)
     for i = 1:length(pkLocs)
         [~,pkLocs(i)] = min(abs(tInterp(pkLocs(i))-t));
     end
-
-    % % fft to find peak period?
-    % tInterp = 0:3600:maxTime;
-    % tInterp = tInterp(tInterp > t(locs(2)));
-    % yInterp = interp1(t,oscDynamics,tInterp);
-    % yInterp = yInterp - mean(yInterp); % remove zero-order
-    % Fs = 1/3600;
-    % N = length(tInterp);
-    % Y_fft = fft(yInterp);
-    % Y_fft = Y_fft(1:floor(N/2+1));
-    % curPower = (1/(Fs*N)) * abs(Y_fft).^2;
-    % curPower(2:end-1) = 2*curPower(2:end-1);
-    % freq = 0:Fs/N:Fs/2;
-    % [~,maxFreqIdx] = max(curPower);
-    % period = 1/freq(maxFreqIdx);
 end

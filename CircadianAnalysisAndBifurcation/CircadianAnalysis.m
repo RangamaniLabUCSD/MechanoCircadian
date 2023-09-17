@@ -4,9 +4,16 @@
 p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
     100; 1; 10; 2; 2];
-if ~exist('pSol','var')
-    error('Load in mechano-Circadian pSol vector first')
+if ~exist('myBayesianAnalysis','var')
+    error('Load in myBayesianAnalysis first')
 end
+uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP','burnIn',1000)
+modeVals = myBayesianAnalysis.Results.PostProc.PointEstimate.X{1};
+fixedParam = [2, 8, 14, 17, 22, 25];
+varyLogic = true(length(p0),1);
+varyLogic(fixedParam) = false;
+pSol = p0;
+pSol(varyLogic) = pSol(varyLogic) .* modeVals';
 p = pSol(1:13);
 
 % convert to units of hours

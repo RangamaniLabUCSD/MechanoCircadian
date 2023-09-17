@@ -1,20 +1,22 @@
-function [T,Y,TRed,SSVarMat,tauVals,param] = MechanoOnlyModel(timeSpan,stiffnessParam)
-% [T,Y,yinit,param] = EAFTests_Scott_Fraley_Rangamani_YAP_TAZ_model_2021__2D_and_3D_simulations_(argTimeSpan,argYinit,argParam)
+function [T,Y,SSVals,tauVals] = MechanoOnlyModel(timeSpan,stiffnessParam)
+% YAP/TAZ and MRTF mechanotransduction model, originally implemented in
+% VCell
 %
 % input:
-%     argTimeSpan is a vector of start and stop times (e.g. timeSpan = [0 10.0])
-%     argYinit is a vector of initial conditions for the state variables (optional)
-%     argParam is a vector of values for the parameters (optional)
+%     timeSpan is a vector of start and stop times (e.g. timeSpan = [0 10.0])
+%     stiffnessParam is a 2 element vector with the stiffness in kPa (first
+%     element) and the time scale of stiffness increase in s (second el)
+%
+%     Currently the time-dependent stiffness is given by
+%     stiffnessParam(1)*t / stiffnessParam(2)
+%     If stiffnessParam(2) is infinite, stiffness remains constant
 %
 % output:
 %     T is the vector of times
 %     Y is the vector of state variables
-%     yinit is the initial conditions that were used
-%     param is the parameter vector that was used
-%     allNames is the output solution variable names
-%     allValues is the output solution variable values corresponding to the names
-%
-%     example of running this file: [T,Y,yinit,param,allNames,allValues] = myMatlabFunc; <-(your main function name)
+%     SSVals is the steady state values for all state variables
+%     tauVals gives the characteristic time scale associate changes in each
+%     state variable
 %
 
 %
@@ -132,7 +134,7 @@ param = [
 	0.0;		% param(75) is 'Kr_r7'
 	0.0;		% param(76) is 'Kr_r6'
 	0.0;		% param(77) is 'Kr_r5'
-	3.25;		% param(78) is 'C'
+	3.25;		% param(78) is 'C' % this is eventually changed for the full mechanoCircadian model
 	0.0;		% param(79) is 'Kr_r4'
 	0.0;		% param(80) is 'Kr_r3'
 	0.0;		% param(81) is 'Kr_r2'
@@ -167,26 +169,13 @@ param(104) = stiffnessParam(2);
 % invoke the integrator
 %
 [T,Y] = ode15s(@f,timeSpan,yinit,odeset('RelTol',1e-8),param,yinit);
-[TRed,YRed] = ode15s(@fRed, timeSpan, yinit([4,15]), odeset('RelTol',1e-8),param);
 [SSVals,tauVals] = fSS(param);
-SSVarMat = zeros(length(TRed),24);
-for k = 1:length(TRed)
-    [~,SSVarMat(k,:)] = fRed(TRed(k),YRed(k,:),param);
-end
 
-
-% % get the solution
-% all = zeros(length(T), numVars);
-% for i = 1:length(T)
-% 	all(i,:) = getRow(T(i), Y(i,:), yinit, param);
-% end
-% 
-% allValues = all;
 end
 
 % -------------------------------------------------------
 % ode rate
-function dydt = f(t,y,p,y0)
+function dydt = f(t,y,p,~)
 	% State Variables
 	CofilinP = y(1);
 	Fak = y(2);
@@ -218,19 +207,19 @@ function dydt = f(t,y,p,y0)
 	krp = p(1);
 	kNC = p(2);
 	kra = p(3);
-	YAPTAZnuc_init_uM = p(4);
+	% YAPTAZnuc_init_uM = p(4);
 	kf = p(5);
 	kmCof = p(6);
 	kfc1 = p(7);
 	kdp = p(8);
 	kdmy = p(9);
-	Myo_init_uM = p(10);
-	mDiaA_init_uM = p(11);
+	% Myo_init_uM = p(10);
+	% mDiaA_init_uM = p(11);
 	kdl = p(12);
-	MyoA_init_uM = p(13);
+	% MyoA_init_uM = p(13);
 	kdf = p(14);
 	krNPC = p(15);
-	ROCKA_init_uM = p(16);
+	% ROCKA_init_uM = p(16);
     if isinf(p(104))
         Emol = p(17);
     else
@@ -239,58 +228,58 @@ function dydt = f(t,y,p,y0)
 	kcatcof = p(18);
 	SAV = p(19);
 	kdrock = p(20);
-	RhoAGDP_init_uM = p(21);
+	% RhoAGDP_init_uM = p(21);
 	kfkp = p(22);
 	Size_Cyto = p(23);
 	kdmdia = p(24);
 	alpha = p(25);
-	Size_ECM = p(26);
-	Voltage_PM = p(27);
+	% Size_ECM = p(26);
+	% Voltage_PM = p(27);
 	kmr = p(28);
 	gamma = p(29);
 	kmp = p(30);
-	CofilinNP_init_uM = p(31);
-	k11 = p(32);
-	netValence_r5 = p(33);
-	netValence_r4 = p(34);
-	netValence_r3 = p(35);
-	netValence_r1 = p(36);
+	% CofilinNP_init_uM = p(31);
+	% k11 = p(32);
+	% netValence_r5 = p(33);
+	% netValence_r4 = p(34);
+	% netValence_r3 = p(35);
+	% netValence_r1 = p(36);
 	kflaminA = p(37);
-	kly = p(38);
-	Fakp_init_uM = p(39);
+	% kly = p(38);
+	% Fakp_init_uM = p(39);
 	klr = p(40);
-	kll = p(41);
-	LaminA_init_molecules_um_2 = p(42);
+	% kll = p(41);
+	% LaminA_init_molecules_um_2 = p(42);
 	mDiaB = p(43);
-	Voltage_NM = p(44);
-	RhoAGTP_MEM_init_molecules_um_2 = p(45);
+	% Voltage_NM = p(44);
+	% RhoAGTP_MEM_init_molecules_um_2 = p(45);
 	kfNPC = p(46);
-	mlabfix_F_nmol_ = p(47);
+	% mlabfix_F_nmol_ = p(47);
 	unitconversionfactor = p(48);
-	mlabfix_T_ = p(49);
-	mDia_init_uM = p(50);
-	K_millivolts_per_volt = p(51);
+	% mlabfix_T_ = p(49);
+	% mDia_init_uM = p(50);
+	% K_millivolts_per_volt = p(51);
 	Kr_r15 = p(52);
 	Kr_r12 = p(53);
 	Clamin = p(54);
 	epsilon = p(55);
-	YAPTAZP_init_uM = p(56);
-	Fcyto_init_uM = p(57);
+	% YAPTAZP_init_uM = p(56);
+	% Fcyto_init_uM = p(57);
 	ROCKB = p(58);
-	Gactin_init_uM = p(59);
+	% Gactin_init_uM = p(59);
 	Size_PM = p(60);
-	LIMKA_init_uM = p(61);
+	% LIMKA_init_uM = p(61);
 	Size_Nuc = p(62);
 	kin2 = p(63);
-	mlabfix_PI_ = p(64);
+	% mlabfix_PI_ = p(64);
 	propStiff = p(65);
-	mlabfix_F_ = p(66);
+	% mlabfix_F_ = p(66);
 	kinSolo2 = p(67);
-	mlabfix_R_ = p(68);
+	% mlabfix_R_ = p(68);
 	tau = p(69);
 	kout2 = p(70);
-	ROCK_init_uM = p(71);
-	mlabfix_K_GHK_ = p(72);
+	% ROCK_init_uM = p(71);
+	% mlabfix_K_GHK_ = p(72);
 	kdep = p(73);
 	Size_NM = p(74);
 	Kr_r7 = p(75);
@@ -302,26 +291,26 @@ function dydt = f(t,y,p,y0)
 	Kr_r2 = p(81);
 	Kr_r1 = p(82);
 	Kr_r0 = p(83);
-	NPC_init_molecules_um_2 = p(84);
-	mlabfix_N_pmol_ = p(85);
+	% NPC_init_molecules_um_2 = p(84);
+	% mlabfix_N_pmol_ = p(85);
 	kCY = p(86);
-	CofilinP_init_uM = p(87);
-	LaminAp_init_molecules_um_2 = p(88);
+	% CofilinP_init_uM = p(87);
+	% LaminAp_init_molecules_um_2 = p(88);
 	kCN = p(89);
-	netValence_r16 = p(90);
-	netValence_r15 = p(91);
-	netValence_r14 = p(92);
-	LIMK_init_uM = p(93);
-	netValence_r12 = p(94);
+	% netValence_r16 = p(90);
+	% netValence_r15 = p(91);
+	% netValence_r14 = p(92);
+	% LIMK_init_uM = p(93);
+	% netValence_r12 = p(94);
 	kturnover = p(95);
-	Fak_init_uM = p(96);
+	% Fak_init_uM = p(96);
 	ksf = p(97);
-	YAPTAZN_init_uM = p(98);
+	% YAPTAZN_init_uM = p(98);
 	n2 = p(99);
 	n1 = p(100);
-	NPCA_init_molecules_um_2 = p(101);
-	Positionboolean_init_molecules_um_2 = p(102);
-	KMOLE = p(103);
+	% NPCA_init_molecules_um_2 = p(101);
+	% Positionboolean_init_molecules_um_2 = p(102);
+	% KMOLE = p(103);
 	% Functions
 	Kf_r9 = (kmr .* (1.0 + (0.5 .* epsilon .* (1.0 + tanh((20.0 .* (ROCKA - ROCKB)))) .* ROCKA)));
 	Kf_r8 = (klr .* (1.0 + (0.5 .* tau .* (1.0 + tanh((20.0 .* (ROCKA - ROCKB)))) .* ROCKA)));
@@ -411,239 +400,6 @@ function dydt = f(t,y,p,y0)
 end
 
 
-% reduced ode (LaminA and YAPTAZnuc are the dynamic variables)
-function [dydt, SSVar] = fRed(t,y,p)
-	% State Variables
-    LaminA = y(1);
-    YAPTAZnuc = y(2);
-	% Constants
-	krp = p(1);
-	kNC = p(2);
-	kra = p(3);
-	YAPTAZnuc_init_uM = p(4);
-	kf = p(5);
-	kmCof = p(6);
-	kfc1 = p(7);
-	kdp = p(8);
-	kdmy = p(9);
-	Myo_init_uM = p(10);
-	mDiaA_init_uM = p(11);
-	kdl = p(12);
-	MyoA_init_uM = p(13);
-	kdf = p(14);
-	krNPC = p(15);
-	ROCKA_init_uM = p(16);
-    if isinf(p(104))
-        Emol = p(17);
-    else
-        Emol = p(17)*t/p(104);
-    end
-	kcatcof = p(18);
-	SAV = p(19);
-	kdrock = p(20);
-	RhoAGDP_init_uM = p(21);
-	kfkp = p(22);
-	Size_Cyto = p(23);
-	kdmdia = p(24);
-	alpha = p(25);
-	Size_ECM = p(26);
-	Voltage_PM = p(27);
-	kmr = p(28);
-	gamma = p(29);
-	kmp = p(30);
-	CofilinNP_init_uM = p(31);
-	k11 = p(32);
-	netValence_r5 = p(33);
-	netValence_r4 = p(34);
-	netValence_r3 = p(35);
-	netValence_r1 = p(36);
-	kflaminA = p(37);
-	kly = p(38);
-	Fakp_init_uM = p(39);
-	klr = p(40);
-	kll = p(41);
-	LaminA_init_molecules_um_2 = p(42);
-	mDiaB = p(43);
-	Voltage_NM = p(44);
-	RhoAGTP_MEM_init_molecules_um_2 = p(45);
-	kfNPC = p(46);
-	mlabfix_F_nmol_ = p(47);
-	unitconversionfactor = p(48);
-	mlabfix_T_ = p(49);
-	mDia_init_uM = p(50);
-	K_millivolts_per_volt = p(51);
-	Kr_r15 = p(52);
-	Kr_r12 = p(53);
-	Clamin = p(54);
-	epsilon = p(55);
-	YAPTAZP_init_uM = p(56);
-	Fcyto_init_uM = p(57);
-	ROCKB = p(58);
-	Gactin_init_uM = p(59);
-	Size_PM = p(60);
-	LIMKA_init_uM = p(61);
-	Size_Nuc = p(62);
-	kin2 = p(63);
-	mlabfix_PI_ = p(64);
-	propStiff = p(65);
-	mlabfix_F_ = p(66);
-	kinSolo2 = p(67);
-	mlabfix_R_ = p(68);
-	tau = p(69);
-	kout2 = p(70);
-	ROCK_init_uM = p(71);
-	mlabfix_K_GHK_ = p(72);
-	kdep = p(73);
-	Size_NM = p(74);
-	Kr_r7 = p(75);
-	Kr_r6 = p(76);
-	Kr_r5 = p(77);
-	C = p(78);
-	Kr_r4 = p(79);
-	Kr_r3 = p(80);
-	Kr_r2 = p(81);
-	Kr_r1 = p(82);
-	Kr_r0 = p(83);
-	NPC_init_molecules_um_2 = p(84);
-	mlabfix_N_pmol_ = p(85);
-	kCY = p(86);
-	CofilinP_init_uM = p(87);
-	LaminAp_init_molecules_um_2 = p(88);
-	kCN = p(89);
-	netValence_r16 = p(90);
-	netValence_r15 = p(91);
-	netValence_r14 = p(92);
-	LIMK_init_uM = p(93);
-	netValence_r12 = p(94);
-	kturnover = p(95);
-	Fak_init_uM = p(96);
-	ksf = p(97);
-	YAPTAZN_init_uM = p(98);
-	n2 = p(99);
-	n1 = p(100);
-	NPCA_init_molecules_um_2 = p(101);
-	Positionboolean_init_molecules_um_2 = p(102);
-	KMOLE = p(103);
-	KFlux_PM_Cyto = (Size_PM ./ Size_Cyto);
-	KFlux_NM_Cyto = (Size_NM ./ Size_Cyto);
-	UnitFactor_uM_um3_molecules_neg_1 = (1000000.0 ./ 6.02214179E8);
-	
-    %SS calcs (some analytical)
-    Faktot = Fak_init_uM + Fakp_init_uM;
-%     BFak = (kf+kdf) + ksf*Emol/(C + Emol);
-%     CFak = Faktot*(kf + ksf*Emol/(C + Emol));
-%     Fakp_inf = Faktot * (ksf*Emol + kf *(C+Emol)) / ((kf+kdf)*(C + Emol) + ksf*Emol);
-%     Fakp = Fakp_inf - (Fakp_inf - Fakp_init_uM)*exp(-BFak*t);
-%     KFak = - (Fakp_inf - Fakp_init_uM);
-    Fakp = Faktot * (ksf*Emol + kf *(C+Emol)) / ((kf+kdf)*(C + Emol) + ksf*Emol);
-    Fak = Faktot - Fakp;
-
-    RhoAGTP_init_uM = RhoAGTP_MEM_init_molecules_um_2 * (UnitFactor_uM_um3_molecules_neg_1*KFlux_PM_Cyto);
-    RhoATot = RhoAGDP_init_uM + RhoAGTP_init_uM;
-%     ARho = RhoATot*kfkp*gamma;
-%     BRho = kdp + kfkp*(gamma*Fakp^n2 + 1);
-%     CRho = RhoATot*kfkp;
-%     RhoAGTP_inf = RhoATot * kfkp*(gamma*Fakp_inf^n2 + 1) / (kdp + kfkp*(gamma*Fakp_inf^n2 + 1)); % uM
-%     Rho_FakTerms = 0;
-%     Rho_FakTerms_0 = 0;
-%     for k = 1:n2
-%         Rho_FakTerms = Rho_FakTerms + ...
-%             -ARho*nchoosek(n2,k)*((CFak^(n2-k)*KFak^k)/(BFak^(n2-k)*k*(BRho-k*BFak)))...
-%             *exp((-k*BFak)*t);
-%         Rho_FakTerms_0 = Rho_FakTerms_0 + ...
-%             -ARho*nchoosek(n2,k)*((CFak^(n2-k)*KFak^k)/(BFak^(n2-k)*k*(BRho-k*BFak)));
-%     end
-%     KRho = RhoAGTP_init_uM - RhoAGTP_inf - Rho_FakTerms_0;
-%     RhoAGTP = RhoAGTP_inf + KRho*exp(-BRho*t) + Rho_FakTerms;
-    RhoAGTP = RhoATot * kfkp*(gamma*Fakp^n2 + 1) / (kdp + kfkp*(gamma*Fakp^n2 + 1));
-    RhoAGDP = RhoATot - RhoAGTP;
-    RhoAGTP_MEM = RhoAGTP * (unitconversionfactor * SAV);
-
-
-    ROCKTot = ROCKA_init_uM + ROCK_init_uM;
-    ROCKAInf = ROCKTot * (krp*RhoAGTP/(kdrock + krp*RhoAGTP));
-    ROCKA0 = ROCKA_init_uM;
-    ROCKA = ROCKAInf - (ROCKAInf-ROCKA0)*exp(-(kdrock + krp*RhoAGTP)*t);
-%     ROCKA = ROCKAInf;
-    ROCK = ROCKTot - ROCKA;
-
-
-    mDiaTot = mDia_init_uM + mDiaA_init_uM;
-    mInf = mDiaTot*kmp*RhoAGTP/(kmp*RhoAGTP + kdmdia);
-    m0 = mDiaA_init_uM;
-    mDiaA = mInf - (mInf-m0)*exp(-(kmp*RhoAGTP + kdmdia)*t);
-%     mDiaA = mInf;
-    mDia = mDiaTot - mDiaA;
-
-    % Compute other SS values
-    % define smooth/tanh functions
-    smoothROCKA = (ROCKA/2) * (tanh(20*(ROCKA-ROCKB)) + 1);
-    smoothmDiaA = (mDiaA/2) * (tanh(20*(mDiaA-mDiaB)) + 1);
-    LIMKTot = LIMKA_init_uM + LIMK_init_uM;
-    LIMKA = LIMKTot*klr*(tau*smoothROCKA + 1)/(kdl + klr*(tau*smoothROCKA + 1));
-    LIMK = LIMKTot - LIMKA;
-    CofilinTot = CofilinP_init_uM + CofilinNP_init_uM;
-    CofilinRoots = roots([kturnover, ...
-                       kcatcof*LIMKA + kmCof*kturnover - kturnover*CofilinTot, ...
-                       -kturnover*kmCof*CofilinTot]);
-    CofilinNPinf = CofilinRoots(CofilinRoots > 0);
-    CofilinNP = CofilinNPinf;
-%     CofilinB = (kturnover + kcatcof*LIMKA/kmCof);
-%     CofilinNP = CofilinNPinf - (CofilinNPinf-CofilinNP_init_uM)*exp(-CofilinB*t);
-    CofilinP = CofilinTot - CofilinNP;
-
-    ActinTot = Fcyto_init_uM + Gactin_init_uM;
-    Fcyto = ActinTot*kra*(alpha*smoothmDiaA+1)...
-        /(kdep + kfc1*CofilinNP + kra*(alpha*smoothmDiaA+1));
-    Gactin = ActinTot - Fcyto;
-
-    MyoTot = Myo_init_uM + MyoA_init_uM;
-    MyoA = MyoTot*kmr*(epsilon*smoothROCKA+1)/(kdmy + kmr*(epsilon*smoothROCKA+1));
-    Myo = MyoTot - MyoA;
-
-    % NPC from SS
-    Ecytosol = propStiff*(Fcyto^n1);
-    LaminATot = LaminAp_init_molecules_um_2 + LaminA_init_molecules_um_2;
-%     LaminA = LaminATot*kflaminA*Ecytosol/(kflaminA*Ecytosol + Kr_r15*(Clamin+Ecytosol));
-    LaminAp = LaminATot - LaminA;
-    NPCTot = NPCA_init_molecules_um_2 + NPC_init_molecules_um_2;
-    NPCA = NPCTot*kfNPC*LaminA*Fcyto*MyoA / (krNPC + kfNPC*LaminA*Fcyto*MyoA);
-    NPC = NPCTot - NPCA;
-
-    % YAPTAZ (calc in terms of molecules, then convert)
-    CytoConvert = Size_Cyto/UnitFactor_uM_um3_molecules_neg_1;
-    NucConvert = Size_Nuc/UnitFactor_uM_um3_molecules_neg_1;
-    YAPTAZnuc = YAPTAZnuc*NucConvert; % convert to molecules
-    YAPTAZTot =  (YAPTAZP_init_uM*CytoConvert + YAPTAZN_init_uM*CytoConvert ...
-        + YAPTAZnuc_init_uM*NucConvert);
-    YAPTAZPFraction = (kNC/(kNC + kCN + kCY*Fcyto*MyoA)); % rapid phosphorylation
-%     YAPTAZnucFraction = (kinSolo2 + kin2*NPCA)/(kout2*Size_Cyto/Size_Nuc + kinSolo2 + kin2*NPCA);
-    YAPTAZCytoTot = YAPTAZTot - YAPTAZnuc;
-    YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
-    YAPTAZN = YAPTAZCytoTot - YAPTAZP;
-    YAPTAZNPTot = YAPTAZTot - YAPTAZP;
-%     YAPTAZCytoTot = YAPTAZTot / (1 + (1-YAPTAZPFraction)*YAPTAZnucFraction/(1-YAPTAZnucFraction));
-%     YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
-%     YAPTAZN = YAPTAZCytoTot - YAPTAZP;
-%     YAPTAZnuc = YAPTAZTot - YAPTAZCytoTot;
-    YAPTAZN = YAPTAZN/CytoConvert;
-    YAPTAZP = YAPTAZP/CytoConvert;
-    YAPTAZnuc = YAPTAZnuc/NucConvert;
-
-    % Rates (LaminA and YAPTAZ dynamics)
-
-    dydt = [kflaminA*(Ecytosol/(Ecytosol+Clamin))*(LaminATot - y(1)) - Kr_r15*y(1);
-        Size_NM*((kinSolo2+kin2*NPCTot*kfNPC*y(1)*Fcyto*MyoA/(kfNPC*y(1)*Fcyto*MyoA + krNPC))...
-        *((YAPTAZTot-y(2)*NucConvert)*(1-YAPTAZPFraction)/CytoConvert) - kout2*y(2))/NucConvert];
-
-
-	SSVar = [CofilinP; Fak; mDia; LaminA; Fcyto; RhoAGTP_MEM; mDiaA; NPCA;...
-        Gactin; NPC; ROCKA; Myo; CofilinNP; LaminAp; YAPTAZnuc; Fakp;...
-        YAPTAZP; YAPTAZN; RhoAGDP; LIMK; MyoA; ROCK; 1; LIMKA]';
-
-end
-
-
 function [SSVar, tauVals] = fSS(p)
 	% Constants
 	krp = p(1);
@@ -663,7 +419,6 @@ function [SSVar, tauVals] = fSS(p)
 	krNPC = p(15);
 	ROCKA_init_uM = p(16);
 	Emol = p(17);
-%     Emol = Emol*(t/(3600*48));
 	kcatcof = p(18);
 	SAV = p(19);
 	kdrock = p(20);
@@ -672,34 +427,34 @@ function [SSVar, tauVals] = fSS(p)
 	Size_Cyto = p(23);
 	kdmdia = p(24);
 	alpha = p(25);
-	Size_ECM = p(26);
-	Voltage_PM = p(27);
+	% Size_ECM = p(26);
+	% Voltage_PM = p(27);
 	kmr = p(28);
 	gamma = p(29);
 	kmp = p(30);
 	CofilinNP_init_uM = p(31);
-	k11 = p(32);
-	netValence_r5 = p(33);
-	netValence_r4 = p(34);
-	netValence_r3 = p(35);
-	netValence_r1 = p(36);
+	% k11 = p(32);
+	% netValence_r5 = p(33);
+	% netValence_r4 = p(34);
+	% netValence_r3 = p(35);
+	% netValence_r1 = p(36);
 	kflaminA = p(37);
-	kly = p(38);
+	% kly = p(38);
 	Fakp_init_uM = p(39);
 	klr = p(40);
-	kll = p(41);
+	% kll = p(41);
 	LaminA_init_molecules_um_2 = p(42);
 	mDiaB = p(43);
-	Voltage_NM = p(44);
+	% Voltage_NM = p(44);
 	RhoAGTP_MEM_init_molecules_um_2 = p(45);
 	kfNPC = p(46);
-	mlabfix_F_nmol_ = p(47);
+	% mlabfix_F_nmol_ = p(47);
 	unitconversionfactor = p(48);
-	mlabfix_T_ = p(49);
+	% mlabfix_T_ = p(49);
 	mDia_init_uM = p(50);
-	K_millivolts_per_volt = p(51);
+	% K_millivolts_per_volt = p(51);
 	Kr_r15 = p(52);
-	Kr_r12 = p(53);
+	% Kr_r12 = p(53);
 	Clamin = p(54);
 	epsilon = p(55);
 	YAPTAZP_init_uM = p(56);
@@ -710,37 +465,37 @@ function [SSVar, tauVals] = fSS(p)
 	LIMKA_init_uM = p(61);
 	Size_Nuc = p(62);
 	kin2 = p(63);
-	mlabfix_PI_ = p(64);
+	% mlabfix_PI_ = p(64);
 	propStiff = p(65);
-	mlabfix_F_ = p(66);
+	% mlabfix_F_ = p(66);
 	kinSolo2 = p(67);
-	mlabfix_R_ = p(68);
+	% mlabfix_R_ = p(68);
 	tau = p(69);
 	kout2 = p(70);
 	ROCK_init_uM = p(71);
-	mlabfix_K_GHK_ = p(72);
+	% mlabfix_K_GHK_ = p(72);
 	kdep = p(73);
-	Size_NM = p(74);
-	Kr_r7 = p(75);
-	Kr_r6 = p(76);
-	Kr_r5 = p(77);
+	% Size_NM = p(74);
+	% Kr_r7 = p(75);
+	% Kr_r6 = p(76);
+	% Kr_r5 = p(77);
 	C = p(78);
-	Kr_r4 = p(79);
-	Kr_r3 = p(80);
-	Kr_r2 = p(81);
-	Kr_r1 = p(82);
-	Kr_r0 = p(83);
+	% Kr_r4 = p(79);
+	% Kr_r3 = p(80);
+	% Kr_r2 = p(81);
+	% Kr_r1 = p(82);
+	% Kr_r0 = p(83);
 	NPC_init_molecules_um_2 = p(84);
-	mlabfix_N_pmol_ = p(85);
+	% mlabfix_N_pmol_ = p(85);
 	kCY = p(86);
 	CofilinP_init_uM = p(87);
 	LaminAp_init_molecules_um_2 = p(88);
 	kCN = p(89);
-	netValence_r16 = p(90);
-	netValence_r15 = p(91);
-	netValence_r14 = p(92);
+	% netValence_r16 = p(90);
+	% netValence_r15 = p(91);
+	% netValence_r14 = p(92);
 	LIMK_init_uM = p(93);
-	netValence_r12 = p(94);
+	% netValence_r12 = p(94);
 	kturnover = p(95);
 	Fak_init_uM = p(96);
 	ksf = p(97);
@@ -748,10 +503,10 @@ function [SSVar, tauVals] = fSS(p)
 	n2 = p(99);
 	n1 = p(100);
 	NPCA_init_molecules_um_2 = p(101);
-	Positionboolean_init_molecules_um_2 = p(102);
-	KMOLE = p(103);
+	% Positionboolean_init_molecules_um_2 = p(102);
+	% KMOLE = p(103);
 	KFlux_PM_Cyto = (Size_PM ./ Size_Cyto);
-	KFlux_NM_Cyto = (Size_NM ./ Size_Cyto);
+	% KFlux_NM_Cyto = (Size_NM ./ Size_Cyto);
 	UnitFactor_uM_um3_molecules_neg_1 = (1000000.0 ./ 6.02214179E8);
 	
     %SS calcs (some analytical)
@@ -824,10 +579,6 @@ function [SSVar, tauVals] = fSS(p)
         + YAPTAZnuc_init_uM*NucConvert);
     YAPTAZPFraction = (kNC/(kNC + kCN + kCY*Fcyto*MyoA)); % rapid phosphorylation
     YAPTAZnucFraction = (kinSolo2 + kin2*NPCA)/(kout2*Size_Cyto/Size_Nuc + kinSolo2 + kin2*NPCA);
-%     YAPTAZCytoTot = YAPTAZTot - YAPTAZnuc;
-%     YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
-%     YAPTAZN = YAPTAZCytoTot - YAPTAZP;
-%     YAPTAZNPTot = YAPTAZTot - YAPTAZP;
     YAPTAZCytoTot = YAPTAZTot / (1 + (1-YAPTAZPFraction)*YAPTAZnucFraction/(1-YAPTAZnucFraction));
     YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
     YAPTAZN = YAPTAZCytoTot - YAPTAZP;
