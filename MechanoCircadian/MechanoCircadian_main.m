@@ -117,8 +117,8 @@ prettyGraph
 xlim([0 5])
 
 %% generate populations for Figs 4-5
-fig4 = true;
-fig5 = false;
+fig4 = false;
+fig5 = true;
 if fig5
     stiffnessVals = [30, 0.3, 30, 30, 30, 30, 30, 30, 30]; %#ok<*UNRCH>
     cytDConc = [0, 0, 1, 0, 0, 0, 0, 0, 0];
@@ -164,7 +164,7 @@ tInterp = 0:1/(3600*Fs):960;
 N = length(tInterp); 
 freq = 0:Fs/N:Fs/2;
 noiseLevel = [0,0,0]; %optional
-snr = 5;
+snr = 100;%5;
 oscVarIdx = 1; % look at BMAL1 here
 
 popSeq = cell(size(stiffnessVals));
@@ -192,7 +192,7 @@ for k = 1:length(stiffnessVals)
         blebbSens = 1.0*exp(randPop(i,110));
         inhibVec(7) = 1/(1 + blebbiConc(k)/blebbSens);
         inhibVec(8) = contactArea(k)*exp(randPop(i,111));
-        inhibVec(9) = 0; %0% LaminA phosphorylation
+        inhibVec(9) = 1; %0% LaminA phosphorylation
         [periodCur,amplCur,tCur,yCur,rawOutput,oscDecayCur] =...
             conditionToOutputs(pCur,stiffnessVals(k),inhibVec,maxTime,randPop(i,1:105),noiseLevel);
         period(i) = periodCur(oscVarIdx);
@@ -283,7 +283,7 @@ periodVec = [popSeq{1}{2}', popSeq{2}{2}', popSeq{3}{2}',...
 powerVec = [popSeq{1}{7}', popSeq{2}{7}', popSeq{3}{7}',...
     popSeq{4}{7}', popSeq{5}{7}', popSeq{6}{7}',...
     popSeq{7}{7}', popSeq{8}{7}', popSeq{9}{7}']; 
-[p,t,aov_period] = anova1(periodVec, conditionsVec) %#ok<*NOPTS>
+[p,t,aov_period] = anova1(periodVec, conditionsVec) %#ok<*ASGLU,*NOPTS>
 m_period = multcompare(aov_period)
 [p,t,aov_power] = anova1(powerVec, conditionsVec)
 m_power = multcompare(aov_power) %#ok<NASGU>
@@ -302,7 +302,7 @@ end
 figure
 errorbar(latAConc, medianPeriod, lowerBarPeriod, upperBarPeriod)
 
-%% Mimic Abenza plots
+%% Mimic Abenza plots (Fig 4)
 meanPowerFraction = zeros(1,length(popSeq));
 stdPowerFraction = zeros(1,length(popSeq));
 meanYAPTAZ = zeros(1,length(popSeq));
@@ -330,9 +330,9 @@ for i = inclIdx
     curPowerFraction = popSeq{i}{7};
     curMRTF = popSeq{i}{5};
     curYAPTAZ = popSeq{i}{4};
-    % if i==2
-    %     curPowerFraction = popSeq{1}{7};
-    % end
+    if i==2
+        curPowerFraction = popSeq{1}{7};
+    end
     meanPowerFraction(i) = median(curPowerFraction);
     stdPowerFraction(i) = std(curPowerFraction)/sqrt(length(curPowerFraction));
     meanYAPTAZ(i) = median(curYAPTAZ);
@@ -382,7 +382,7 @@ ylabel('Circadian power fraction')
 
 %% plot population dynamics in heat maps
 figure
-plotIdx = [1,2,3];
+plotIdx = [1,2];
 for i = 1:length(plotIdx)
     subplot(1,length(plotIdx),i)
     imagesc(popSeq{plotIdx(i)}{1}*13.5)
@@ -399,7 +399,6 @@ for i = 1:length(plotIdx)
 end
 
 %% average population dynamics
-maxTime = 3600*1000;
 Fs = 1/(15*60); % match experiment case of measuring every 15 minutes
 tInterp = 0:1/(3600*Fs):960;
 figure
@@ -448,3 +447,67 @@ m_MRTF = multcompare(aov_MRTF)
 m_power = multcompare(aov_power)
 % aov_oscDecay = anova(oscDecayMat)
 % m_oscDecay = multcompare(aov_oscDecay)
+
+%% movie of population-level oscillations
+figure
+curOscMat = popSeq{2}{1}*13.5;
+for i = 1:size(curOscMat,1)
+    curOscMat(i,:) = smooth(curOscMat(i,:),9);
+end
+
+xCellLocs = 0:20;
+yCellLocs = 0:20;
+[xCellLocs, yCellLocs] = meshgrid(xCellLocs, yCellLocs);
+xCellLocs = xCellLocs(:) + 0.2*randn(size(xCellLocs(:)));
+yCellLocs = yCellLocs(:) + 0.2*randn(size(yCellLocs(:)));
+colorMap = parula(256);
+numCells = length(yCellLocs);
+
+saveVid = true;
+if saveVid
+    frameRate = 20;
+    path = uigetdir('','Choose where to save video');
+    myVideo = VideoWriter(fullfile(path,'YAPMutantPop_softSubstrate.mp4'),'MPEG-4');
+    myVideo.FrameRate = frameRate;
+    open(myVideo)
+end
+
+for i = 1:4:4*24*14+1%size(curOscMat,2)
+    curOscVals = curOscMat(1:numCells,i);
+    colorIdx = round(255*curOscVals/60) + 1;
+    colorIdx(colorIdx > 256) = 256;
+    scatter(xCellLocs, yCellLocs, 20*ones(size(xCellLocs)), colorMap(colorIdx,:), "filled")
+    xlim([-1 21])
+    ylim([-1 21])
+    prettyGraph
+    title(sprintf('t = %.2f days',(i-1)*0.25/24))
+    cb = colorbar;
+    cb.Label.String = 'BMAL1 (nM)'
+    clim([0 60])
+    xticks([])
+    yticks([])
+
+    drawnow
+    if saveVid
+        img = print('-RGBImage','-r300');
+        writeVideo(myVideo, img)
+    end
+end
+
+if saveVid
+    close(myVideo)
+end
+
+%% mutant comparison for single cell with MAP parameters
+stiffnessVals = [300, 300, 300];
+YAPOverexpress = [0, 1, 0]
+laminAPhos = [1, 1, 0];
+maxTime = 3600*480;
+figure
+hold on
+for i = 1:length(stiffnessVals)
+    inhibVec = [1,1,1,YAPOverexpress(i),0,1,1,3000,laminAPhos(i)];
+    [periodCur, amplitudeCur, tOut, yOut] = conditionToOutputs(pSol,stiffnessVals(i),inhibVec,maxTime,0);
+    plot(tOut/3600, yOut(:,2)*13.5)
+end
+prettyGraph

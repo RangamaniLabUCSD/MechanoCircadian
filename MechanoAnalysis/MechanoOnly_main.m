@@ -24,6 +24,7 @@ fixedParam = [2, 8, 14, 17, 22, 25];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 pSol = p0;
+pSol(varyLogic) = pSol(varyLogic) .* modeVals';
 pSolMRTFIdx = [31, 32, 30, 18, 33, 27, 28, 19];
 pSolMRTF = pSol(pSolMRTFIdx);
 popParamMRTF = popParam(:, pSolMRTFIdx);

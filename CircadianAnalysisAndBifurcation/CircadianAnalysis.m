@@ -43,7 +43,6 @@ circStoreCell = cell(size(KdBPVals));
 
 for k = 1:length(KdBPVals)
     p(5) = KdBPVals(k); p(6) = KdBVals(k); p(11) = KdPVals(k);
-    p(1) = tauBVals(k); p(7) = tauPVals(k);
     period = zeros(size(KeB2Mat));
     oscDecayRate = zeros(size(KeB2Mat));
     amplitude = zeros(size(KeB2Mat));
@@ -90,6 +89,21 @@ for i = 1:length(circStoreCell)
     clim([min(oscPeriod(oscPeriod>0)) max(oscPeriod(:))])
 end
 
+%% compute KeB2 and KeP2 for YAP/TAZ branch
+curBranch = BranchesStored{2};
+YVals = curBranch{1};
+MVals = curBranch{2};
+CytoConv = 1.3851e6;
+NucConv = 3.3122e5;
+Ytot = 1.4784e6;
+Mtot = 1e6;
+YConcVals = YVals*Ytot./(CytoConv + YVals*NucConv);
+MConcVals = MVals*Mtot./(CytoConv + MVals*NucConv);
+KeB2Vals = 3600*(pSol(12)*YConcVals.^2./(pSol(13)^2+YConcVals.^2) +...
+                pSol(23)*MConcVals.^2./(pSol(24)^2+MConcVals.^2));
+KeP2Vals = 3600*(pSol(15)*MConcVals.^2./(pSol(16)^2+MConcVals.^2) +...
+                pSol(20)*YConcVals.^2./(pSol(21)^2+YConcVals.^2)); 
+
 %% plot phase diagram with Hopf bifurcation (from running ddeBifCircadian.m)
 YVals = logspace(-1,1.3,40);
 MVals = logspace(-1,1.3,40);
@@ -127,7 +141,8 @@ yStored = cell(size(stiffnessVec));
 for i = 1:length(stiffnessVec)
     actinInhib = 1 + (1 + pSol(27))*JasVec(i) / pSol(28);
     cytoDConc = CytDVec(i);
-    inhibVec = [actinInhib, 1, 1, 1, cytoDConc, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)] 
+    inhibVec = [actinInhib, 1, 1, 1, cytoDConc, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)]
+    inhibVec(7:9) = [1,3000,1];
     [~,~, ~, ~, rawOutput] = conditionToOutputs(pSol,stiffnessVec(i),inhibVec,24*15*3600);
     t = rawOutput{1};
     y = rawOutput{2};
