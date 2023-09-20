@@ -1,5 +1,5 @@
 %% Test mechano-Circadian model for range of stiffnesses
-stiffnessVals = logspace(-1,3,20);
+stiffnessVals = 1e7;%logspace(-1,3,20);
 inhibMag = 0; % optionally set inhibitor case (currently, this is set to change Jas concentration)
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
@@ -117,17 +117,17 @@ prettyGraph
 xlim([0 5])
 
 %% generate populations for Figs 4-5
-fig4 = false;
-fig5 = true;
+fig4 = true;
+fig5 = false;
 if fig5
-    stiffnessVals = [30, 0.3, 30, 30, 30, 30, 30, 30, 30];
+    stiffnessVals = [30, 0.3, 30, 30, 30, 30, 30, 30, 30]; %#ok<*UNRCH>
     cytDConc = [0, 0, 1, 0, 0, 0, 0, 0, 0];
     latAConc = [0, 0, 0, 0.2, 0, 0, 0, 0, 0];
     LATSFactor = [1, 1, 1, 1, 7.5, 1, 1, 1, 1]; % 1 is low density, 7.5 for high density
     blebbiConc = [0, 0, 0, 0, 0, 10, 0, 0, 0];
     jaspConc = [0, 0, 0, 0, 0, 0, 1, 0, 0];
     contactArea = [3000, 1000, 5000, 600, 1200, 4000, 3000, 1600, 900];
-elseif fig4 %#ok<UNRCH>
+elseif fig4 
     stiffnessVals = [0.1, 0.3, 1, 3, 10, 30, 100, 300, 1e7];
     cytDConc = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     latAConc = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -247,6 +247,7 @@ for k = 1:length(stiffnessVals)
         powerInterp = interp1(freq, allPower(i,:), freqInterp);
         powerFraction(i) = trapz(freqInterp, powerInterp) / totPower;
     end
+    refPeriod = [];
     popSeq{k} = {oscStored, period, ampl, YAPTAZStored, MRTFStored, refPeriod, powerFraction, oscDecayRate, avgPower};
     ksdensity(powerFraction,'Support',[0 1],'BoundaryCorrection','reflection')
     drawnow
@@ -255,7 +256,7 @@ end
 %% plot single cell distributions for Fig4 (stiffness tests)
 figure
 % subplot(2,1,1)
-violinplot([popSeq{9}{2},popSeq{7}{2},popSeq{5}{2},popSeq{3}{2},popSeq{1}{2}]/3600)
+violinplot([popSeq{1}{2},popSeq{3}{2},popSeq{5}{2},popSeq{7}{2},popSeq{9}{2}]/3600)
 xticklabels({'0.1','1','10','100','1e7'})
 ylim([23 28.5])
 xlabel('Substrate stiffness (kPa)')
@@ -264,7 +265,7 @@ prettyGraph
 
 figure
 % subplot(2,1,2)
-violinplot([popSeq{9}{7},popSeq{7}{7},popSeq{5}{7},popSeq{3}{7},popSeq{1}{7}])
+violinplot([popSeq{1}{7},popSeq{3}{7},popSeq{5}{7},popSeq{7}{7},popSeq{9}{7}])
 xticklabels({'0.1','1','10','100','1e7'})
 ylim([0 1])
 xlabel('Substrate stiffness (kPa)')
@@ -276,15 +277,15 @@ numCells = length(popSeq{1}{2});
 conditionsVec = [0.1*ones(1,numCells), 0.3*ones(1,numCells), 1*ones(1,numCells),...
     3*ones(1,numCells), 10*ones(1,numCells), 30*ones(1,numCells),...
     100*ones(1,numCells), 300*ones(1,numCells), 1e7*ones(1,numCells)];
-periodVec = [popSeq{9}{2}', popSeq{8}{2}', popSeq{7}{2}',...
-    popSeq{6}{2}', popSeq{5}{2}', popSeq{4}{2}',...
-    popSeq{3}{2}', popSeq{2}{2}', popSeq{1}{2}']/3600; 
-powerVec = [popSeq{9}{7}', popSeq{8}{7}', popSeq{7}{7}',...
-    popSeq{6}{7}', popSeq{5}{7}', popSeq{4}{7}',...
-    popSeq{3}{7}', popSeq{2}{7}', popSeq{1}{7}']; 
-aov_period = anova(conditionsVec, periodVec) %#ok<*NOPTS>
+periodVec = [popSeq{1}{2}', popSeq{2}{2}', popSeq{3}{2}',...
+    popSeq{4}{2}', popSeq{5}{2}', popSeq{6}{2}',...
+    popSeq{7}{2}', popSeq{8}{2}', popSeq{9}{2}']/3600; 
+powerVec = [popSeq{1}{7}', popSeq{2}{7}', popSeq{3}{7}',...
+    popSeq{4}{7}', popSeq{5}{7}', popSeq{6}{7}',...
+    popSeq{7}{7}', popSeq{8}{7}', popSeq{9}{7}']; 
+[p,t,aov_period] = anova1(periodVec, conditionsVec) %#ok<*NOPTS>
 m_period = multcompare(aov_period)
-aov_power = anova(conditionsVec, powerVec)
+[p,t,aov_power] = anova1(powerVec, conditionsVec)
 m_power = multcompare(aov_power) %#ok<NASGU>
 
 
@@ -329,9 +330,9 @@ for i = inclIdx
     curPowerFraction = popSeq{i}{7};
     curMRTF = popSeq{i}{5};
     curYAPTAZ = popSeq{i}{4};
-    if i==2
-        curPowerFraction = popSeq{1}{7};
-    end
+    % if i==2
+    %     curPowerFraction = popSeq{1}{7};
+    % end
     meanPowerFraction(i) = median(curPowerFraction);
     stdPowerFraction(i) = std(curPowerFraction)/sqrt(length(curPowerFraction));
     meanYAPTAZ(i) = median(curYAPTAZ);
@@ -397,6 +398,18 @@ for i = 1:length(plotIdx)
     xlabel('Time (days)')
 end
 
+%% average population dynamics
+maxTime = 3600*1000;
+Fs = 1/(15*60); % match experiment case of measuring every 15 minutes
+tInterp = 0:1/(3600*Fs):960;
+figure
+hold on
+for i = 1:length(popSeq)
+    meanDyn = mean(popSeq{i}{1});
+    plot(tInterp,meanDyn)
+    popSeq{i}{10} = meanDyn;
+end
+
 %% Compare mutant results
 figure
 % subplot(3,1,1)
@@ -427,11 +440,11 @@ YAPTAZMat = [popSeq{1}{4}, popSeq{2}{4}, popSeq{3}{4}];
 MRTFMat = [popSeq{1}{5}, popSeq{2}{5}, popSeq{3}{5}]; 
 powerMat = [popSeq{1}{7}, popSeq{2}{7}, popSeq{3}{7}];
 % oscDecayMat = [popSeq{1}{8}, popSeq{2}{8}, popSeq{3}{8}]
-aov_YAPTAZ = anova(YAPTAZMat)
+[p,t,aov_YAPTAZ] = anova1(YAPTAZMat)
 m_YAPTAZ = multcompare(aov_YAPTAZ)
-aov_MRTF = anova(MRTFMat)
+[p,t,aov_MRTF] = anova1(MRTFMat)
 m_MRTF = multcompare(aov_MRTF)
-aov_power = anova(powerMat)
+[p,t,aov_power] = anova1(powerMat)
 m_power = multcompare(aov_power)
 % aov_oscDecay = anova(oscDecayMat)
 % m_oscDecay = multcompare(aov_oscDecay)

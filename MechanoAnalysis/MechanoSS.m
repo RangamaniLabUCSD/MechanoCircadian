@@ -343,6 +343,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     Fcyto = ActinTot*kra*(alpha*smoothmDiaA+1)...
         /(kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap));
     Gactin = (ActinTot - Fcyto*(1+cytoDConc/Kcap))/(1 + cytoDConc/Kdim);
+    % GactinAlt = Fcyto*(kdep + kfc1*CofilinNP)/(kra*(alpha*smoothmDiaA+1));
     ActinTau = (kdep_tot + kra*(alpha*smoothmDiaA+1)*(1+cytoDConc/Kcap))^(-1);
 
     MyoTot = Myo_init_uM + MyoA_init_uM;
