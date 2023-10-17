@@ -42,9 +42,7 @@ for i = 1:numConditions
     meanDynVals(i,:) = mean(dynMat,1);
     stdDynVals(i,:) = std(dynMat,1);
     % figure
-    errorbar(tSample, meanDynVals(i,:), stdDynVals(i,:), stdDynVals(i,:))
-    % plot(tSample, 0.5*amplVec(i)*(cos(2*pi*tSample/(periodVec(i)))))
-    plot(tSample, 0.5*(cos(2*pi*tSample/(periodVec(i)))))
+    errorbar(tSample, meanDynVals(i,:)-shiftVal, stdDynVals(i,:), stdDynVals(i,:))
 end
 shiftVal = min(meanDynVals(:) - stdDynVals(:));
 dataVec = [meanDynVals-shiftVal; stdDynVals];
@@ -88,10 +86,10 @@ myData.Name = 'PER expression oscillation';
 Solver.Type = 'MCMC';
 Solver.MCMC.Sampler = 'AIES';
 Solver.MCMC.NChains = 60;
-Solver.MCMC.Steps = 6000;
+Solver.MCMC.Steps = 10000;
 Solver.MCMC.Visualize.Parameters = 3;%[3 8];
 Solver.MCMC.Visualize.Interval = 50;
-Solver.MCMC.Seed = initialSeed;
+% Solver.MCMC.Seed = initialSeed;
 BayesOpts.Type = 'Inversion';
 BayesOpts.Name = 'Bayesian model';
 BayesOpts.Prior = myPriorDist;
@@ -276,7 +274,7 @@ legendEntries = {'Control','0.1uM Jas','0.2uM Jas','0.5uM Jas'};
 [periodJas, amplJas] = plotConditions(paramMat, testsMat, plotDynMat, expDataCell, legendEntries);
 
 %% Total summary
-spaghetti = false; % optional - plot individual sample curves (spaghetti plot)
+spaghetti = true; % optional - plot individual sample curves (spaghetti plot)
 figure
 testsCell = {stiffnessTests, ROCKInhibTests, CytDTests, LatBTests, JasTests};
 periodCell = {periodStiffness, periodROCKInhib, periodCytD, periodLatB, periodJas};
@@ -357,7 +355,7 @@ for i = 1:length(testsCell)
     ylabel('Normalized amplitude')
     % legend('Model','Experiments')
     prettyGraph
-    ylim([0 5.5])
+    ylim([0 10])
     % set(gca,'YScale','log')
 end
 

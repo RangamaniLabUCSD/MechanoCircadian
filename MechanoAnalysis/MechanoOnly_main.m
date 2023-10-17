@@ -11,7 +11,7 @@ ylabel('Nuclear to cytoplasmic ratio')
 xlabel('Time (minutes)')
 prettyGraph
 
-%% extract pSolMRTF from full solve
+%% load pSol
 p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
     100; 1; 10; 2; 2];
@@ -25,9 +25,6 @@ varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 pSol = p0;
 pSol(varyLogic) = pSol(varyLogic) .* modeVals';
-pSolMRTFIdx = [31, 32, 30, 18, 33, 27, 28, 19];
-pSolMRTF = pSol(pSolMRTFIdx);
-popParamMRTF = popParam(:, pSolMRTFIdx);
 
 %% plot MRTF test cases
 stiffnessVals = logspace(-1,4,100);
@@ -73,7 +70,7 @@ hold on
 jaspVals = 0:.01:1.5;
 MRTFEq = zeros(size(jaspVals));
 for i = 1:length(jaspVals)
-    actinPolyFactor = 1 + (1+pSolMRTF(5))*jaspVals(i)/pSolMRTF(6);
+    actinPolyFactor = 1 + (1+pSol(27))*jaspVals(i)/pSol(28);
     inhibVec = [actinPolyFactor,1,1,1, 0];
     stiffnessVec = [1e7,inf,0];
     SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
@@ -83,7 +80,7 @@ figure
 plot(jaspVals,MRTFEq)
 hold on
 
-%% plot data comparison of MRTF vs. substrate stiffness (Fig S3)
+%% plot data comparison of MRTF vs. substrate stiffness (supp fig)
 stiffnessTests = [1e7; 1e7; 1e7; 0.175; 0.175; 0.175;...
         0.3; 20; 1e7;... 
         6.573705179; 15.79681275; 25.47144754; 34.58167331;...
@@ -149,50 +146,64 @@ prettyGraph
 xlabel('Substrate stiffness (kPa)')
 ylabel('MRTF nuclear to cytosolic ratio')
 
-%% compile effects of cytoskeletal inhibitors (Fig S6)
+%% compile effects of cytoskeletal inhibitors (Fig 3)
+stiffnessVals = logspace(-1,3,100);
 cytDVals = 0:.1:10;
 latBVals = 0:.05:5;
 jaspVals = 0:.01:1;
-cytDCell = {cytDVals, zeros(size(latBVals)), zeros(size(jaspVals))};
-latBCell = {zeros(size(cytDVals)), latBVals, zeros(size(jaspVals))};
-jaspCell = {zeros(size(cytDVals)), zeros(size(latBVals)), jaspVals};
-conditionVecs = {cytDVals, latBVals, jaspVals};
-treatmentStrings = {'Cytochalasin D (uM)','Latrunculin B (uM)','Jasplakinolide (uM)'};
+stiffnessCell = {stiffnessVals, 1e7*ones(size(cytDVals)), 1e7*ones(size(latBVals)), 1e7*ones(size(jaspVals))};
+cytDCell = {zeros(size(stiffnessVals)), cytDVals, zeros(size(latBVals)), zeros(size(jaspVals))};
+latBCell = {zeros(size(stiffnessVals)), zeros(size(cytDVals)), latBVals, zeros(size(jaspVals))};
+jaspCell = {zeros(size(stiffnessVals)), zeros(size(cytDVals)), zeros(size(latBVals)), jaspVals};
+conditionVecs = {stiffnessVals, cytDVals, latBVals, jaspVals};
+treatmentStrings = {'Substrate stiffness (kPa)', 'Cytochalasin D (uM)','Latrunculin B (uM)','Jasplakinolide (uM)'};
 figure
-MRTFCell = cell(1,3);
-YAPTAZCell = cell(1,3);
-FActinCell = cell(1,3);
-GActinCell = cell(1,3);
+MRTFCell = cell(1,length(stiffnessCell));
+YAPTAZCell = cell(1,length(stiffnessCell));
+FActinCell = cell(1,length(stiffnessCell));
+ECytoCell = cell(1,length(stiffnessCell));
+GActinCell = cell(1,length(stiffnessCell));
 for i = 1:length(cytDCell)
     MRTFCell{i} = zeros(size(cytDCell{i}));
     YAPTAZCell{i} = zeros(size(cytDCell{i}));
     FActinCell{i} = zeros(size(cytDCell{i}));
+    ECytoCell{i} = zeros(size(cytDCell{i}));
     GActinCell{i} = zeros(size(cytDCell{i}));
     for j = 1:length(cytDCell{i})
         actinPolyFactor = 1 / (1 + (latBCell{i}(j)/pSol(26))) + (1 + pSol(27))*jaspCell{i}(j) / pSol(28);
         inhibVec = [actinPolyFactor,1,1,1, cytDCell{i}(j)];
         inhibVec(6:9) = [1,1,3000,1];
-        stiffnessVec = [1e7,inf,0];
+        stiffnessVec = [stiffnessCell{i}(j),inf,0];
         SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
         MRTFCell{i}(j) = SSVar(25)/SSVar(26);
         YAPTAZCell{i}(j) = SSVar(15)/(SSVar(17)+SSVar(18));
         FActinCell{i}(j) = SSVar(5);
+        ECytoCell{i}(j) = 9e-6 * SSVar(5)^2.6;
         GActinCell{i}(j) = SSVar(9);
     end
-    subplot(3,2,2*i-1)
+    subplot(length(cytDCell),2,2*i-1)
+    % subplot(2,length(cytDCell),2*i-1)
     curOrder = colororder("default");
-    colororder(curOrder([1,4],:))
+    colororder(curOrder(5,:))
     plot(conditionVecs{i}, FActinCell{i}, 'LineWidth', 1.5, 'Color', curOrder(2,:))
     hold on
     plot(conditionVecs{i}, GActinCell{i}, 'LineWidth', 1.5, 'Color', curOrder(3,:))
-    ylabel('Actin concentration')
-    xlabel(treatmentStrings{i})
-    if i==1
-        legend('F-actin','G-actin')
-    end
+    ylabel('Actin conc. (uM)')
     ylim([0 510])
+    yyaxis right
+    plot(conditionVecs{i}, ECytoCell{i}, 'LineWidth', 1.5, 'Color', curOrder(5,:), 'LineStyle', '-.')
+    ylabel('ECyto (kPa)')
+    xlabel(treatmentStrings{i})
+    xlim([min(conditionVecs{i}), max(conditionVecs{i})])
+    if i==1
+        legend('F-actin','G-actin','ECyto')
+        set(gca, 'XScale', 'log')
+        xlim([1 1000])
+    end
     prettyGraph
-    subplot(3,2,2*i)
+    subplot(length(cytDCell),2,2*i)
+    % subplot(2,length(cytDCell),2*i)
+    colororder(curOrder([1,4],:))
     plot(conditionVecs{i}, YAPTAZCell{i}, 'LineWidth', 1.5)
     ylabel('YAP/TAZ N/C')
     ylim([0 ceil(max(YAPTAZCell{i}))])
@@ -201,8 +212,11 @@ for i = 1:length(cytDCell)
     ylabel('MRTF N/C')
     ylim([0 ceil(max(MRTFCell{i}))])
     xlabel(treatmentStrings{i})
-    prettyGraph
+    xlim([min(conditionVecs{i}), max(conditionVecs{i})])
     if i==1
         legend('YAP/TAZ N/C','MRTF N/C')
+        set(gca, 'XScale', 'log')
+        xlim([1 1000])
     end
+    prettyGraph
 end

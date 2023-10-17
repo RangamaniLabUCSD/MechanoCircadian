@@ -92,15 +92,23 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     magCouple2 = magCouple2 * inhibVec(3);
     magCouple4 = magCouple4 * inhibVec(3);
     
-    lags = [tauB, tauP, 12*3600]; % third is nominal delay (only affects time shift of reporter, can be any delay in general)
+    lags = [tauB, tauP, 1*3600]; % third is nominal delay (only affects time shift of reporter, can be any delay in general)
 
     SSVals = MechanoSS(stiffnessParam, inhibVec, pSol, popVar);
     YAPTAZnuc_SS = SSVals(15);
     MRTFnuc_SS = SSVals(25);
-    KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
-           magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
-    KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
-           magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
+    mechanoStartEffect = false; % optionally consider effect of YAP/TAZ and MRTF jumping in value after first time lag
+    if mechanoStartEffect
+        KeB2 = magCouple1 / (1 + (KdCouple1/0.7)^nCouple1) +...
+               magCouple4 / (1 + (KdCouple4/0.301)^nCouple4);
+        KeP2 = magCouple2 / (1 + (KdCouple2/0.301)^nCouple2) +...
+               magCouple3 / (1 + (KdCouple3/0.7)^nCouple3);
+    else
+        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
+               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
+        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
+               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
+    end
     fsolveOptions = optimoptions('fsolve','Display','off');
     unstableSS = fsolve(@(ss) [KeB/(1+(ss(1)/KiB)^pExpB) + KeB2 - KdBP*ss(1)*ss(2) - KdB*ss(1);
                                KeP/(1+(KaP/ss(1))^pExpP) + KeP2 - KdBP*ss(1)*ss(2) - KdP*ss(2)],...
@@ -127,16 +135,15 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     function dydt = ddefun_YAPSS(t,y,Z)
         clockLag1 = Z(1,1);
         clockLag2 = Z(1,2);
-        mechanoStartEffect = false; % optionally consider effect of YAP/TAZ and MRTF jumping in value after first time lag
         if t < lags(1) && mechanoStartEffect
-            YAPTAZnuc_B = YAPTAZnuc_init_uM;
+            YAPTAZnuc_B = 0.7;
             MRTFnuc_B = .301;
         else
             YAPTAZnuc_B = YAPTAZnuc_SS;
             MRTFnuc_B = MRTFnuc_SS;
         end
         if t < lags(2) && mechanoStartEffect
-            YAPTAZnuc_P = YAPTAZnuc_init_uM;
+            YAPTAZnuc_P = 0.7;
             MRTFnuc_P = .301;
         else
             YAPTAZnuc_P = YAPTAZnuc_SS;

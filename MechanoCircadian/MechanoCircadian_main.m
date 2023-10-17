@@ -1,5 +1,5 @@
 %% Test mechano-Circadian model for range of stiffnesses
-stiffnessVals = 1e7;%logspace(-1,3,20);
+stiffnessVals = 100;%1e7;%logspace(-1,3,20);
 inhibMag = 0; % optionally set inhibitor case (currently, this is set to change Jas concentration)
 [stiffnessMesh,inhibMesh] = meshgrid(stiffnessVals,inhibMag);
 stiffnessVals = stiffnessMesh(:);
@@ -12,7 +12,7 @@ YAPTAZEq = zeros(size(stiffnessVals));
 MRTFEq = zeros(size(stiffnessVals));
 FcytoEq = zeros(size(stiffnessVals));
 GactinEq = zeros(size(stiffnessVals));
-figure
+% figure
 hold on
 colorSeries = [0,0,.8; .796,0,.8; 0,.69,.314; 1,0,0]; % color scheme from plots
 noiseLevel = [0,0]; %optional - test noise for SDDE solver
@@ -60,14 +60,15 @@ end
 %% plot detailed control case (Fig 1C)
 refConc = 13.5;
 maxTime = 240*3600;
-inhibVec = [1, 1, 1, 1, 0, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), cytD, LATS] 
-[t, y, ySS] = MechanoCircadianModel([0 maxTime], [1e7,inf], pSol, inhibVec, 0);%kraMult(i));
+inhibVec = [1, 1, 1, 1, 0, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), cytD, LATS]
+inhibVec(7:9) = [1,3000,1];
+[t, y, ySS] = MechanoCircadianModel([0 maxTime], [100,inf], pSol, inhibVec, 0);%kraMult(i));
 [~,locs] = findpeaks(y(:,2));
 tShift = t(locs(3))/(3600);
 figure
 subplot(3,1,1)
 plot(t/3600 - tShift,refConc*y(:,1), 'LineWidth', 1.5)
-ylim([0 0.5*refConc])
+ylim([0 0.4*refConc])
 xlabel('Time (hr)')
 ylabel({'Nuclear BMAL1', '(nM)'})
 hold on
@@ -84,15 +85,17 @@ MConc = ySS(25);
 KeB2 = (pSol(12)*YConc^2/(pSol(13)^2+YConc^2) + pSol(23)*MConc^2/(pSol(24)^2+MConc^2));
 KeP = pSol(9)./(1 + (pSol(10)./y(:,1)).^pSol(8));
 KeP2 = (pSol(15)*MConc^2/(pSol(16)^2+MConc^2) + pSol(20)*YConc^2/(pSol(21)^2+YConc^2));
-plot((t+pSol(1))/3600 - tShift, refConc*(KeB+KeB2)*3600, 'LineWidth', 1.5)
+% plot((t+pSol(1))/3600 - tShift, refConc*(KeB+KeB2)*3600, 'LineWidth', 1.5)
+plot((t)/3600 - tShift, refConc*(KeB)*3600, 'LineWidth', 1.5)
 xlabel('Time (hr)')
-ylabel({'BMAL1 expression','rate (nM/hr)'})
-ylim([0 0.5*refConc])
+ylabel({'BMAL1 expr.','rate (nM/hr)'})
+ylim([0 0.25*refConc])
 hold on
 yyaxis right
-plot((t+pSol(7))/3600 - tShift, refConc*(KeP+KeP2)*3600, 'LineWidth', 1.5)
+% plot((t+pSol(7))/3600 - tShift, refConc*(KeP+KeP2)*3600, 'LineWidth', 1.5)
+plot((t)/3600 - tShift, refConc*(KeP)*3600, 'LineWidth', 1.5)
 ylim([0 2.5*refConc])
-ylabel({'PER/CRY expression','rate (nM/hr)'})
+ylabel({'PER/CRY expr.','rate (nM/hr)'})
 xlim([0 48])
 prettyGraph
 subplot(3,1,3)
@@ -107,7 +110,7 @@ prettyGraph
 figure
 plot(t/(3600*24) - tShift/24,refConc*y(:,1), 'LineWidth', 1.5)
 ylim([0 0.45*refConc])
-xlabel('Time (hr)')
+xlabel('Time (days)')
 ylabel({'Nuclear BMAL1 (nM)'})
 yyaxis right
 plot(t/(3600*24) - tShift/24,refConc*y(:,2), 'LineWidth', 1.5)
@@ -117,13 +120,13 @@ prettyGraph
 xlim([0 5])
 
 %% generate populations for Figs 4-5
-fig4 = false;
-fig5 = true;
+fig4 = true;
+fig5 = false;
 if fig5
     stiffnessVals = [30, 0.3, 30, 30, 30, 30, 30, 30, 30]; %#ok<*UNRCH>
     cytDConc = [0, 0, 1, 0, 0, 0, 0, 0, 0];
     latAConc = [0, 0, 0, 0.2, 0, 0, 0, 0, 0];
-    LATSFactor = [1, 1, 1, 1, 7.5, 1, 1, 1, 1]; % 1 is low density, 7.5 for high density
+    LATSFactor = [1, 1, 1, 1, 3, 1, 1, 1, 1]; % 1 is low density, 3 for high density
     blebbiConc = [0, 0, 0, 0, 0, 10, 0, 0, 0];
     jaspConc = [0, 0, 0, 0, 0, 0, 1, 0, 0];
     contactArea = [3000, 1000, 5000, 600, 1200, 4000, 3000, 1600, 900];
@@ -131,7 +134,7 @@ elseif fig4
     stiffnessVals = [0.1, 0.3, 1, 3, 10, 30, 100, 300, 1e7];
     cytDConc = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     latAConc = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-    LATSFactor = [1, 1, 1, 1, 1, 1, 1, 1, 1]; % 1 is low density, 7.5 for high density
+    LATSFactor = [1, 1, 1, 1, 1, 1, 1, 1, 1]; % 1 is low density, 3 for high density
     blebbiConc = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     jaspConc = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     contactArea = 3000*ones(1,9);
@@ -147,16 +150,18 @@ p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/
 fixedParam = [2, 8, 14, 17, 22, 25];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
-flatSamples = zeros(numParam, size(samples,1)*size(samples,3));
-for i = 1:size(samples,1)
-    flatSamples(:,size(samples,3)*(i-1)+1:size(samples,3)*i) = samples(i,:,:);
-end
-rVals = randi(size(flatSamples,2), numCells, 1);
-for i = 1:numCells
-    popParam(i,varyLogic) = flatSamples(:,rVals(i));
-end
-popParam = popParam .* p0';
-randPop = sqrt(popVar)*randn([numCells, 112]);
+% flatSamples = zeros(numParam, size(samples,1)*size(samples,3));
+% for i = 1:size(samples,1)
+%     flatSamples(:,size(samples,3)*(i-1)+1:size(samples,3)*i) = samples(i,:,:);
+% end
+% rVals = randi(size(flatSamples,2), numCells, 1);
+% for i = 1:numCells
+%     popParam(i,varyLogic) = flatSamples(:,rVals(i));
+% end
+% popParam = popParam .* p0';
+% randPop = sqrt(popVar)*randn([numCells, 112]);
+popParam = popParamWT;
+randPop = randPopWT;
 
 maxTime = 3600*1000;
 Fs = 1/(15*60); % match experiment case of measuring every 15 minutes
@@ -164,7 +169,7 @@ tInterp = 0:1/(3600*Fs):960;
 N = length(tInterp); 
 freq = 0:Fs/N:Fs/2;
 noiseLevel = [0,0,0]; %optional
-snr = 100;%5;
+snr = 5;
 oscVarIdx = 1; % look at BMAL1 here
 
 popSeq = cell(size(stiffnessVals));
@@ -178,6 +183,7 @@ for k = 1:length(stiffnessVals)
     allPower = zeros(numCells, floor(N/2+1));
     YAPTAZStored = zeros(numCells,1);
     MRTFStored = zeros(numCells,1);
+    ySS_stored = zeros(numCells, 26);
     period = zeros(numCells,1);
     ampl = zeros(numCells,1);
     oscDecayRate = zeros(numCells,1);
@@ -186,13 +192,14 @@ for k = 1:length(stiffnessVals)
         pCur = popParam(i,:);
         inhibVec = ones(1,9);
         inhibVec(1) =  1 / (1 + (latAConc(k)/popParam(i,26))) + (1 + popParam(i,27))*jaspConc(k) / popParam(i,28);
-        inhibVec(4) = 0*exp(randPop(i,112));%0.1; % fold overexpression of 5SA-YAP
+        inhibVec(4) = 0*exp(randPop(i,112)); % fold overexpression of 5SA-YAP
         inhibVec(5) = cytDConc(k); % CytD
         inhibVec(6) = LATSFactor(k)*exp(randPop(i,109)); %high density LATS factor=7.5, low density=1
         blebbSens = 1.0*exp(randPop(i,110));
         inhibVec(7) = 1/(1 + blebbiConc(k)/blebbSens);
         inhibVec(8) = contactArea(k)*exp(randPop(i,111));
-        inhibVec(9) = 1; %0% LaminA phosphorylation
+        inhibVec(9) = 0; % percent LaminA phosphorylation (0 for mutant, 1 for normal)
+        inhibVec(10) = 2; % fold LaminA expression (no variation here because variation occurs in LaminA conc in MechanoSS) (1 for normal, 2 for mutant)
         [periodCur,amplCur,tCur,yCur,rawOutput,oscDecayCur] =...
             conditionToOutputs(pCur,stiffnessVals(k),inhibVec,maxTime,randPop(i,1:105),noiseLevel);
         period(i) = periodCur(oscVarIdx);
@@ -213,6 +220,7 @@ for k = 1:length(stiffnessVals)
         oscStored(i,:) = oscCur;
         YAPTAZStored(i) = ySS(15)/(ySS(17)+ySS(18));
         MRTFStored(i) = ySS(25)/ySS(26);
+        ySS_stored(i,:) = ySS;
         yPowerCalc = oscCur';
         yPowerCalc = filtfilt([0.2,0.2,0.2,0.2,0.2], 1, yPowerCalc); % same filter settings as Abenza et al
         yPowerCalc = (yPowerCalc - mean(yPowerCalc)) / std(yPowerCalc);
@@ -248,10 +256,11 @@ for k = 1:length(stiffnessVals)
         powerFraction(i) = trapz(freqInterp, powerInterp) / totPower;
     end
     refPeriod = [];
-    popSeq{k} = {oscStored, period, ampl, YAPTAZStored, MRTFStored, refPeriod, powerFraction, oscDecayRate, avgPower};
+    popSeq{k} = {oscStored, period, ampl, YAPTAZStored, MRTFStored, refPeriod, powerFraction, oscDecayRate, avgPower, popParam, randPop, ySS_stored};
     ksdensity(powerFraction,'Support',[0 1],'BoundaryCorrection','reflection')
     drawnow
 end
+save('StiffnessTestSeq_LMNAMutant_sharedWTVals.mat','popSeq')
 
 %% plot single cell distributions for Fig4 (stiffness tests)
 figure
@@ -331,7 +340,7 @@ for i = inclIdx
     curMRTF = popSeq{i}{5};
     curYAPTAZ = popSeq{i}{4};
     if i==2
-        curPowerFraction = popSeq{1}{7};
+        curPowerFraction = (curPowerFraction + popSeq{1}{7})/2;
     end
     meanPowerFraction(i) = median(curPowerFraction);
     stdPowerFraction(i) = std(curPowerFraction)/sqrt(length(curPowerFraction));
@@ -380,6 +389,22 @@ legend(conditionsStrings(inclIdx))
 xlabel('MRTF N/C')
 ylabel('Circadian power fraction')
 
+%% load color map 
+% (this is tailored to a single json (inferno) currently, 
+% would need to be edited for loading in other color maps)
+[json_file,json_path] = uigetfile('*.json','Select json file with color map');
+json_file = fullfile(json_path,json_file);
+load_colors = readcell(json_file,'FileType','text');
+RGBPoints = cell2mat(load_colors(16:1039));
+RGBPoints = reshape(RGBPoints',[4, length(RGBPoints)/4]);
+dataVals = RGBPoints(1,:);
+dataInterp = dataVals(1):(dataVals(end)-dataVals(1))/1000:dataVals(end);
+RGBVals = RGBPoints(2:4,:);
+RInterp = interp1(dataVals,RGBVals(1,:),dataInterp);
+GInterp = interp1(dataVals,RGBVals(2,:),dataInterp);
+BInterp = interp1(dataVals,RGBVals(3,:),dataInterp);
+RGBInterp = vertcat(RInterp,GInterp,BInterp);
+
 %% plot population dynamics in heat maps
 figure
 plotIdx = [1,2];
@@ -390,9 +415,9 @@ for i = 1:length(plotIdx)
     ylim([0 200])
     xticks(1+4*24*[0, 1, 2, 3, 4, 5, 6, 7])
     xticklabels({'0','1','2','3','4','5','6','7'})
-    % colormap('turbo')
+    colormap(RGBInterp(:,150:end)')
     clim([0 60])
-    xlim([0 4*5*24])
+    xlim([0 4*3.05*24])
     prettyGraph
     ylabel('Cell number')
     xlabel('Time (days)')
@@ -412,18 +437,18 @@ end
 %% Compare mutant results
 figure
 % subplot(3,1,1)
-violinplot([popSeq{1}{4},popSeq{2}{4},popSeq{3}{4}])
+violinplot([popSeq{1}{12}(:,15),popSeq{2}{12}(:,15),popSeq{3}{12}(:,15)])
 xticklabels({'WT','YAP mutant','LMNA mutant'})
 % ylim([-.5 .4])
-ylabel('YAP/TAZ N/C')
+ylabel('YAP/TAZ nuclear conc. (uM)')
 prettyGraph
 
 figure
 % subplot(3,1,2)
-violinplot([popSeq{1}{5},popSeq{2}{5},popSeq{3}{5}])
+violinplot([popSeq{1}{12}(:,25),popSeq{2}{12}(:,25),popSeq{3}{12}(:,25)])
 xticklabels({'WT','YAP mutant','LMNA mutant'})
 % ylim([-1.5 .6])
-ylabel('MRTF N/C')
+ylabel('MRTF nuclear conc. (uM)')
 prettyGraph
 
 figure
@@ -435,8 +460,8 @@ ylabel('Circadian power fraction')
 prettyGraph
 
 %% ANOVA and multiple comparisons for mutant results
-YAPTAZMat = [popSeq{1}{4}, popSeq{2}{4}, popSeq{3}{4}]; 
-MRTFMat = [popSeq{1}{5}, popSeq{2}{5}, popSeq{3}{5}]; 
+YAPTAZMat = [popSeq{1}{12}(:,15), popSeq{2}{12}(:,15), popSeq{3}{12}(:,15)]; 
+MRTFMat = [popSeq{1}{12}(:,25), popSeq{2}{12}(:,25), popSeq{3}{12}(:,25)]; 
 powerMat = [popSeq{1}{7}, popSeq{2}{7}, popSeq{3}{7}];
 % oscDecayMat = [popSeq{1}{8}, popSeq{2}{8}, popSeq{3}{8}]
 [p,t,aov_YAPTAZ] = anova1(YAPTAZMat)
@@ -511,3 +536,119 @@ for i = 1:length(stiffnessVals)
     plot(tOut/3600, yOut(:,2)*13.5)
 end
 prettyGraph
+
+%% mutant comparison on different stiffnesses
+figure
+loadWT = load('StiffnessTestSeq_WT.mat');
+popSeq_WT = loadWT.popSeq;
+loadLaminAMutant = load('StiffnessTestSeq_LMNAMutant_sharedWTVals.mat');
+popSeq_LMNA = loadLaminAMutant.popSeq;
+loadYAPMutant = load('StiffnessTestSeq_YAPMutant_sharedWTVals.mat');
+popSeq_YAP = loadYAPMutant.popSeq;
+stiffnessVals = [0.1, 0.3, 1, 3, 10, 30, 100, 300, 1e7];
+numCells = length(popSeq_WT{1}{4});
+YAPTAZ_WT = zeros(numCells,length(stiffnessVals));
+YAPTAZ_LMNA = zeros(numCells,length(stiffnessVals));
+YAPTAZ_YAP = zeros(numCells,length(stiffnessVals));
+for i = 1:length(stiffnessVals)
+    YAPTAZ_WT(:,i) = popSeq_WT{i}{4};
+    YAPTAZ_LMNA(:,i) = popSeq_LMNA{i}{4};
+    YAPTAZ_YAP(:,i) = popSeq_YAP{i}{4};
+end
+errorbar(stiffnessVals, median(YAPTAZ_WT), median(YAPTAZ_WT)-quantile(YAPTAZ_WT,0.25),...
+    quantile(YAPTAZ_WT,0.75)-median(YAPTAZ_WT))
+hold on
+errorbar(stiffnessVals, median(YAPTAZ_LMNA), median(YAPTAZ_LMNA)-quantile(YAPTAZ_LMNA,0.25),...
+    quantile(YAPTAZ_LMNA,0.75)-median(YAPTAZ_LMNA))
+errorbar(stiffnessVals, median(YAPTAZ_YAP), median(YAPTAZ_YAP)-quantile(YAPTAZ_YAP,0.25),...
+    quantile(YAPTAZ_YAP,0.75)-median(YAPTAZ_YAP))
+% prctilePlot(stiffnessVals, YAPTAZ_WT','b')
+% hold on
+% prctilePlot(stiffnessVals, YAPTAZ_LMNA','r')
+set(gca, 'XScale', 'log')
+% subplot(3,1,1)
+% violinplot([popSeq{1}{4},popSeq{2}{4},popSeq{3}{4},popSeq{4}{4},popSeq{5}{4},popSeq{6}{4}])
+% xticklabels({'WT 30 kPa','WT 0.3 kPa','YAP mutant 30 kPa','YAP mutant 0.3 kPa','LMNA mutant 30 kPa','LMNA mutant 0.3 kPa'})
+% ylim([-.5 .4])
+ylabel('YAP/TAZ N/C')
+prettyGraph
+
+figure
+MRTF_WT = zeros(length(popSeq_WT{1}{5}),length(stiffnessVals));
+MRTF_LMNA = zeros(length(popSeq_WT{1}{5}),length(stiffnessVals));
+MRTF_YAP = zeros(length(popSeq_WT{1}{5}),length(stiffnessVals));
+for i = 1:length(stiffnessVals)
+    MRTF_WT(:,i) = popSeq_WT{i}{5};
+    MRTF_LMNA(:,i) = popSeq_LMNA{i}{5};
+    MRTF_YAP(:,i) = popSeq_YAP{i}{5};
+end
+errorbar(stiffnessVals, median(MRTF_WT), median(MRTF_WT)-quantile(MRTF_WT,0.25),...
+    quantile(MRTF_WT,0.75)-median(MRTF_WT))
+hold on
+errorbar(stiffnessVals, median(MRTF_LMNA), median(MRTF_LMNA)-quantile(MRTF_LMNA,0.25),...
+    quantile(MRTF_LMNA,0.75)-median(MRTF_LMNA))
+errorbar(stiffnessVals, median(MRTF_YAP), median(MRTF_YAP)-quantile(MRTF_YAP,0.25),...
+    quantile(MRTF_YAP,0.75)-median(MRTF_YAP))
+% prctilePlot(stiffnessVals, MRTF_WT', 'b')
+% hold on
+% prctilePlot(stiffnessVals, MRTF_LMNA', 'r')
+set(gca, 'XScale', 'log')
+% subplot(3,1,2)
+% violinplot([popSeq{1}{5},popSeq{2}{5},popSeq{3}{5},popSeq{4}{5},popSeq{5}{5},popSeq{6}{5}])
+% xticklabels({'WT 30 kPa','WT 0.3 kPa','YAP mutant 30 kPa','YAP mutant 0.3 kPa','LMNA mutant 30 kPa','LMNA mutant 0.3 kPa'})
+% ylim([-1.5 .6])
+ylabel('MRTF N/C')
+prettyGraph
+
+figure
+powerFrac_WT = zeros(length(popSeq_WT{1}{7}),length(stiffnessVals));
+powerFrac_LMNA = zeros(length(popSeq_WT{1}{7}),length(stiffnessVals));
+powerFrac_YAP = zeros(length(popSeq_WT{1}{7}),length(stiffnessVals));
+for i = 1:length(stiffnessVals)
+    powerFrac_WT(:,i) = popSeq_WT{i}{7};
+    powerFrac_LMNA(:,i) = popSeq_LMNA{i}{7};
+    powerFrac_YAP(:,i) = popSeq_YAP{i}{7};
+end
+errorbar(stiffnessVals, median(powerFrac_WT), median(powerFrac_WT)-quantile(powerFrac_WT,0.25),...
+    quantile(powerFrac_WT,0.75)-median(powerFrac_WT))
+hold on
+errorbar(stiffnessVals, median(powerFrac_LMNA), median(powerFrac_LMNA)-quantile(powerFrac_LMNA,0.25),...
+    quantile(powerFrac_LMNA,0.75)-median(powerFrac_LMNA))
+errorbar(stiffnessVals, median(powerFrac_YAP), median(powerFrac_YAP)-quantile(powerFrac_YAP,0.25),...
+    quantile(powerFrac_YAP,0.75)-median(powerFrac_YAP))
+% prctilePlot(stiffnessVals, powerFrac_WT', 'b')
+% hold on
+% prctilePlot(stiffnessVals, powerFrac_LMNA', 'r')
+set(gca, 'XScale', 'log')
+% subplot(3,1,3)
+% violinplot([popSeq{1}{7},popSeq{2}{7},popSeq{3}{7},popSeq{4}{7},popSeq{5}{7},popSeq{6}{7}])
+% xticklabels({'WT 30 kPa','WT 0.3 kPa','YAP mutant 30 kPa','YAP mutant 0.3 kPa','LMNA mutant 30 kPa','LMNA mutant 0.3 kPa'})
+ylim([0 1])
+ylabel('Circadian power fraction')
+prettyGraph
+
+%%
+figure
+powerMat = [powerFrac_WT(:,6), powerFrac_WT(:,2), powerFrac_YAP(:,6),...
+    powerFrac_YAP(:,2), powerFrac_LMNA(:,6), powerFrac_LMNA(:,4)]; 
+violinplot(powerMat(:,[1,3,5,4,6]))
+xticklabels({'WT (30 kPa)','YAP mutant (30 kPa)','LMNA mutant (30 kPa)',...
+    'YAP mutant (0.3 kPa)', 'LMNA mutant (3 kPa)'})
+ylim([0 1])
+ylabel('Circadian power fraction')
+prettyGraph
+
+%% ANOVA and multiple comparisons for mutant results
+YAPTAZMat = [YAPTAZ_WT(:,6), YAPTAZ_WT(:,2), YAPTAZ_YAP(:,6),...
+    YAPTAZ_YAP(:,2), YAPTAZ_LMNA(:,6), YAPTAZ_LMNA(:,4)]; 
+MRTFMat = [MRTF_WT(:,6), MRTF_WT(:,2), MRTF_YAP(:,6),...
+    MRTF_YAP(:,2), MRTF_LMNA(:,6), MRTF_LMNA(:,4)];  
+% oscDecayMat = [popSeq{1}{8}, popSeq{2}{8}, popSeq{3}{8}]
+[p,t,aov_YAPTAZ] = anova1(YAPTAZMat)
+m_YAPTAZ = multcompare(aov_YAPTAZ)
+[p,t,aov_MRTF] = anova1(MRTFMat)
+m_MRTF = multcompare(aov_MRTF)
+[p,t,aov_power] = anova1(powerMat)
+m_power = multcompare(aov_power)
+% aov_oscDecay = anova(oscDecayMat)
+% m_oscDecay = multcompare(aov_oscDecay)
