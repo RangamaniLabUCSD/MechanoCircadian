@@ -1,6 +1,6 @@
 %% two variable DDE model of Circadian oscillations
-% here, we test a range of KeB2 and KeP2 associated with different values
-% of YAP/TAZ and MRTF (see MechanoCircadian.m for full model)
+
+%% first define pSol
 p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
     100; 1; 10; 2; 2];
@@ -20,6 +20,8 @@ p = pSol(1:13);
 p([1,7]) = p([1,7])/3600;
 p([3,5,6,9,11,12,13]) = p([3,5,6,9,11,12,13])*3600;
 
+%% here, we test a range of KeB2 and KeP2 associated with different values
+% of YAP/TAZ and MRTF (see MechanoCircadian.m for full model)
 timeSpan = [0 960];
 YVals = logspace(-1,1.3,40);
 MVals = logspace(-1,1.3,40);
@@ -43,7 +45,6 @@ circStoreCell = cell(size(KdBPVals));
 
 for k = 1:length(KdBPVals)
     p(5) = KdBPVals(k); p(6) = KdBVals(k); p(11) = KdPVals(k);
-    p(1) = tauBVals(k); p(7) = tauPVals(k);
     period = zeros(size(KeB2Mat));
     oscDecayRate = zeros(size(KeB2Mat));
     amplitude = zeros(size(KeB2Mat));
@@ -90,6 +91,21 @@ for i = 1:length(circStoreCell)
     clim([min(oscPeriod(oscPeriod>0)) max(oscPeriod(:))])
 end
 
+%% compute KeB2 and KeP2 for YAP/TAZ branch
+curBranch = BranchesStored{2};
+YVals = curBranch{1};
+MVals = curBranch{2};
+CytoConv = 1.3851e6;
+NucConv = 3.3122e5;
+Ytot = 1.4784e6;
+Mtot = 1e6;
+YConcVals = YVals*Ytot./(CytoConv + YVals*NucConv);
+MConcVals = MVals*Mtot./(CytoConv + MVals*NucConv);
+KeB2Vals = 3600*(pSol(12)*YConcVals.^2./(pSol(13)^2+YConcVals.^2) +...
+                pSol(23)*MConcVals.^2./(pSol(24)^2+MConcVals.^2));
+KeP2Vals = 3600*(pSol(15)*MConcVals.^2./(pSol(16)^2+MConcVals.^2) +...
+                pSol(20)*YConcVals.^2./(pSol(21)^2+YConcVals.^2)); 
+
 %% plot phase diagram with Hopf bifurcation (from running ddeBifCircadian.m)
 YVals = logspace(-1,1.3,40);
 MVals = logspace(-1,1.3,40);
@@ -115,19 +131,21 @@ set(gca,'XScale','log')
 set(gca,'YScale','log')
 
 % paper figure with different treatment cases
-colorOrder = linspecer(6);
+colorOrder = linspecer(8);
 colorOrder = vertcat([0, 0, 0], colorOrder);
-CytDVec = [0, 0, 0, 2, 5, 0, 0];
-JasVec = [0, 0, 0, 0, 0, .1, .5];
-stiffnessVec = [1e7, 10, 1, 1e7, 1e7, 1e7, 1e7];
-markersVec = {'p','s','s','o','o','+','+'};
+CytDVec = [0, 0, 0, 2, 5, 0, 0, 0];
+LatBVec = [0, 0, 0, 0, 0, 0, 0, 2];
+JasVec = [0, 0, 0, 0, 0, .1, .5, 0];
+stiffnessVec = [1e7, 10, 1, 1e7, 1e7, 1e7, 1e7, 1e7];
+markersVec = {'p','s','s','o','o','+','+','x'};
 YAPTAZEq = zeros(size(stiffnessVec));
 MRTFEq = zeros(size(stiffnessVec));
 yStored = cell(size(stiffnessVec));
 for i = 1:length(stiffnessVec)
-    actinInhib = 1 + (1 + pSol(27))*JasVec(i) / pSol(28);
+    actinInhib =  1 / (1 + (LatBVec(i)/pSol(26))) + (1 + pSol(27))*JasVec(i) / pSol(28);
     cytoDConc = CytDVec(i);
-    inhibVec = [actinInhib, 1, 1, 1, cytoDConc, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)] 
+    inhibVec = [actinInhib, 1, 1, 1, cytoDConc, 1]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)]
+    inhibVec(7:9) = [1,3000,1];
     [~,~, ~, ~, rawOutput] = conditionToOutputs(pSol,stiffnessVec(i),inhibVec,24*15*3600);
     t = rawOutput{1};
     y = rawOutput{2};
@@ -138,12 +156,12 @@ for i = 1:length(stiffnessVec)
     yStored{i} = [t, y];
 end
 
-%% plot dynamics for figure in paper
+%% plot dynamics for Fig 3
 figure
-groupsIdx = {1:3, [1,4,5], [1,6,7]};
+groupsIdx = {1:3, [1,4,5], [1,6,7]};%, [1,8]};
 refConc = 13.5;
 legendStrings = {'Control', '10 kPa substrate', '1 kPa substrate',...
-    '2 uM CytD', '5 uM CytD', '0.1 uM Jas', '0.5 uM Jas'};
+    '2 uM CytD', '5 uM CytD', '0.1 uM Jas', '0.5 uM Jas', '1 uM LatB'};
 for i = 1:length(groupsIdx)
     subplot(length(groupsIdx),1,i)
     curGroupIdx = groupsIdx{i};

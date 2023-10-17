@@ -42,9 +42,7 @@ for i = 1:numConditions
     meanDynVals(i,:) = mean(dynMat,1);
     stdDynVals(i,:) = std(dynMat,1);
     % figure
-    errorbar(tSample, meanDynVals(i,:), stdDynVals(i,:), stdDynVals(i,:))
-    % plot(tSample, 0.5*amplVec(i)*(cos(2*pi*tSample/(periodVec(i)))))
-    plot(tSample, 0.5*(cos(2*pi*tSample/(periodVec(i)))))
+    errorbar(tSample, meanDynVals(i,:)-shiftVal, stdDynVals(i,:), stdDynVals(i,:))
 end
 shiftVal = min(meanDynVals(:) - stdDynVals(:));
 dataVec = [meanDynVals-shiftVal; stdDynVals];
@@ -88,10 +86,10 @@ myData.Name = 'PER expression oscillation';
 Solver.Type = 'MCMC';
 Solver.MCMC.Sampler = 'AIES';
 Solver.MCMC.NChains = 60;
-Solver.MCMC.Steps = 6000;
+Solver.MCMC.Steps = 10000;
 Solver.MCMC.Visualize.Parameters = 3;%[3 8];
 Solver.MCMC.Visualize.Interval = 50;
-Solver.MCMC.Seed = initialSeed;
+% Solver.MCMC.Seed = initialSeed;
 BayesOpts.Type = 'Inversion';
 BayesOpts.Name = 'Bayesian model';
 BayesOpts.Prior = myPriorDist;
@@ -187,15 +185,15 @@ popParam = popParam .* p0';
 meanFibroblastControlPeriod = (4*FibroblastStiffnessPeriod(1,1) +...
         3*FibroblastROCKInhibPeriod(1,1) + 3*FibroblastCytDPeriod(1,1) +...
         3*FibroblastLatBPeriod(1,1) + 3*FibroblastJasPeriod(1,1))/16;
-stdFibroblastControlPeriod = sqrt((4*FibroblastStiffnessPeriod(1,2) +...
-        3*FibroblastROCKInhibPeriod(1,2) + 3*FibroblastCytDPeriod(1,2) +...
-        3*FibroblastLatBPeriod(1,2) + 3*FibroblastJasPeriod(1,2))/16);
+stdFibroblastControlPeriod = sqrt((4*FibroblastStiffnessPeriod(1,2)^2 +...
+        3*FibroblastROCKInhibPeriod(1,2)^2 + 3*FibroblastCytDPeriod(1,2)^2 +...
+        3*FibroblastLatBPeriod(1,2)^2 + 3*FibroblastJasPeriod(1,2)^2)/16);
 meanFibroblastControlAmpl = (4*FibroblastStiffnessAmpl(1,1) +...
         3*FibroblastROCKInhibAmpl(1,1) + 3*FibroblastCytDAmpl(1,1) +...
         3*FibroblastLatBAmpl(1,1) + 3*FibroblastJasAmpl(1,1))/16;
-stdFibroblastControlAmpl = sqrt((4*FibroblastStiffnessAmpl(1,2) +...
-        3*FibroblastROCKInhibAmpl(1,2) + 3*FibroblastCytDAmpl(1,2) +...
-        3*FibroblastLatBAmpl(1,2) + 3*FibroblastJasAmpl(1,2))/16);
+stdFibroblastControlAmpl = sqrt((4*FibroblastStiffnessAmpl(1,2)^2 +...
+        3*FibroblastROCKInhibAmpl(1,2)^2 + 3*FibroblastCytDAmpl(1,2)^2 +...
+        3*FibroblastLatBAmpl(1,2)^2 + 3*FibroblastJasAmpl(1,2)^2)/16);
 FibroblastStiffnessPeriod(1,:) = [meanFibroblastControlPeriod, stdFibroblastControlPeriod];
 FibroblastStiffnessAmpl(1,:) = [meanFibroblastControlAmpl, stdFibroblastControlAmpl];
 FibroblastROCKInhibPeriod(1,:) = [meanFibroblastControlPeriod, stdFibroblastControlPeriod];
@@ -276,7 +274,7 @@ legendEntries = {'Control','0.1uM Jas','0.2uM Jas','0.5uM Jas'};
 [periodJas, amplJas] = plotConditions(paramMat, testsMat, plotDynMat, expDataCell, legendEntries);
 
 %% Total summary
-spaghetti = false; % optional - plot individual sample curves (spaghetti plot)
+spaghetti = true; % optional - plot individual sample curves (spaghetti plot)
 figure
 testsCell = {stiffnessTests, ROCKInhibTests, CytDTests, LatBTests, JasTests};
 periodCell = {periodStiffness, periodROCKInhib, periodCytD, periodLatB, periodJas};
@@ -357,7 +355,7 @@ for i = 1:length(testsCell)
     ylabel('Normalized amplitude')
     % legend('Model','Experiments')
     prettyGraph
-    ylim([0 5.5])
+    ylim([0 10])
     % set(gca,'YScale','log')
 end
 
