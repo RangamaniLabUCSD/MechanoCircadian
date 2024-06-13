@@ -12,15 +12,15 @@ xlabel('Time (minutes)')
 prettyGraph
 
 %% load pSol
-p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
+p0 = [12*3600; 2; 0.01/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 0.1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
-    100; 1; 10; 2; 2];
+    100; 1; 10; 2; 2; 1/3600; 0.1; 0.4/3600; 7.5*3600; .05/3600; 1; .05/3600; 1; 2; 2; 2];
 if ~exist('myBayesianAnalysis','var')
     error('Load in myBayesianAnalysis first')
 end
-uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP','burnIn',1000)
+uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP','burnIn',500)
 modeVals = myBayesianAnalysis.Results.PostProc.PointEstimate.X{1};
-fixedParam = [2, 8, 14, 17, 22, 25];
+fixedParam = [5, 14, 17, 22, 25, 44, 45];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 pSol = p0;
@@ -34,7 +34,7 @@ YAPTAZEq = zeros(size(stiffnessVals));
 FactinEq = zeros(size(stiffnessVals));
 GactinEq = zeros(size(stiffnessVals));
 for i = 1:length(stiffnessVals)
-    inhibVec = [1,1,1,1, 0];
+    inhibVec = [1,1,1,0, 0];
     inhibVec(6:9) = [1,1,3000,1];
     stiffnessVec = [stiffnessVals(i),inf];
     SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
@@ -53,7 +53,7 @@ hold on
 cytDVals = 0:.1:12;
 MRTFEq = zeros(size(cytDVals));
 for i = 1:length(cytDVals)
-    inhibVec = [1,1,1,1, cytDVals(i)];
+    inhibVec = [1,1,1,0, cytDVals(i)];
     inhibVec(6:9) = [1,1,3000,1];
     stiffnessVec = [1e7,inf,0];
     SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
@@ -71,7 +71,8 @@ jaspVals = 0:.01:1.5;
 MRTFEq = zeros(size(jaspVals));
 for i = 1:length(jaspVals)
     actinPolyFactor = 1 + (1+pSol(27))*jaspVals(i)/pSol(28);
-    inhibVec = [actinPolyFactor,1,1,1, 0];
+    inhibVec = [actinPolyFactor,1,1,0, 0];
+    inhibVec(6:9) = [1,1,3000,1];
     stiffnessVec = [1e7,inf,0];
     SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
     MRTFEq(i) = SSVar(25)/SSVar(26);
@@ -81,6 +82,7 @@ plot(jaspVals,MRTFEq)
 hold on
 
 %% plot data comparison of MRTF vs. substrate stiffness (supp fig)
+% first generate popParam from file MechanoCircadian_fit
 stiffnessTests = [1e7; 1e7; 1e7; 0.175; 0.175; 0.175;...
         0.3; 20; 1e7;... 
         6.573705179; 15.79681275; 25.47144754; 34.58167331;...
@@ -112,8 +114,9 @@ stiffnessVals = logspace(-1,4,100);
 MRTFEq = zeros(size(popParam,1), length(stiffnessVals));
 for k = 1:size(popParam,1)
     pCur = popParam(k,:);
+    % pCur(31:32) = 10*pCur(31:32);
     for i = 1:length(stiffnessVals)
-        inhibVec = [1,1,1,1, 0];
+        inhibVec = [1,1,1,0,0];
         inhibVec(6:9) = [1,1,3000,1];
         stiffnessVec = [stiffnessVals(i),inf,0];
         SSVar = MechanoSS(stiffnessVec, inhibVec, pCur);
@@ -156,7 +159,7 @@ cytDCell = {zeros(size(stiffnessVals)), cytDVals, zeros(size(latBVals)), zeros(s
 latBCell = {zeros(size(stiffnessVals)), zeros(size(cytDVals)), latBVals, zeros(size(jaspVals))};
 jaspCell = {zeros(size(stiffnessVals)), zeros(size(cytDVals)), zeros(size(latBVals)), jaspVals};
 conditionVecs = {stiffnessVals, cytDVals, latBVals, jaspVals};
-treatmentStrings = {'Substrate stiffness (kPa)', 'Cytochalasin D (uM)','Latrunculin B (uM)','Jasplakinolide (uM)'};
+treatmentStrings = {'Substrate stiffness (kPa)', 'Cytochalasin D (μM)','Latrunculin B (μM)','Jasplakinolide (μM)'};
 figure
 MRTFCell = cell(1,length(stiffnessCell));
 YAPTAZCell = cell(1,length(stiffnessCell));
@@ -188,7 +191,7 @@ for i = 1:length(cytDCell)
     plot(conditionVecs{i}, FActinCell{i}, 'LineWidth', 1.5, 'Color', curOrder(2,:))
     hold on
     plot(conditionVecs{i}, GActinCell{i}, 'LineWidth', 1.5, 'Color', curOrder(3,:))
-    ylabel('Actin conc. (uM)')
+    ylabel('Actin conc. (μM)')
     ylim([0 510])
     yyaxis right
     plot(conditionVecs{i}, ECytoCell{i}, 'LineWidth', 1.5, 'Color', curOrder(5,:), 'LineStyle', '-.')

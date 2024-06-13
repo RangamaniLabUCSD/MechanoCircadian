@@ -54,25 +54,34 @@ function [periodTest, amplTest, tOut, yOut, rawOutput, oscDecayRate] = condition
         maxTime = 3600*24*7;
         popVar = 0;
         noiseLevel = [0,0];
+        Ke3 = [0,0,0];
     elseif length(varargin)==1
         maxTime = varargin{1};
         popVar = 0;
         noiseLevel = [0,0];
+        Ke3 = [0,0,0];
     elseif length(varargin)==2
         maxTime = varargin{1};
         popVar = varargin{2};
         noiseLevel = [0,0];
+        Ke3 = [0,0,0];
     elseif length(varargin)==3
         maxTime = varargin{1};
         popVar = varargin{2};
         noiseLevel = varargin{3};
+        Ke3 = [0,0,0];
+    elseif length(varargin)==4
+        maxTime = varargin{1};
+        popVar = varargin{2};
+        noiseLevel = varargin{3};
+        Ke3 = varargin{4};
     end
-    [t,y,ySS] = MechanoCircadianModel([0 maxTime], [stiffness,inf,0], p, inhibVec, popVar, noiseLevel);
+    [t,y,ySS] = MechanoCircadianModel([0 maxTime], [stiffness,inf,0], p, inhibVec, popVar, noiseLevel, Ke3);
     if any(~isreal(y(:))) || any(y(:)<0)
         periodTest = zeros(1,size(y,2));
         amplTest = 1e-6*ones(1,size(y,2));
         tOut = (0:3600:maxTime/2)';
-        yOut = zeros([length(tOut), 3]);
+        yOut = zeros([length(tOut), 4]);
         rawOutput = {t, y, ySS};
         oscDecayRate = -1*ones(1,size(y,2));
         return
@@ -85,13 +94,15 @@ function [periodTest, amplTest, tOut, yOut, rawOutput, oscDecayRate] = condition
         oscDynamics = y(:,i);
         [periodTest(i), amplTest(i), oscDecayRate(i), locs{i}] = circOscAnalysis(t, oscDynamics);
     end
-    if length(locs{3})>2
-        maxTimeOut = min([maxTime*0.9, t(end)-t(locs{3}(2))]);
+    if length(locs{4})>2
+        maxTimeOut = min([maxTime*0.9, t(end)-t(locs{4}(2))]);
         tOut = (0:3600:maxTimeOut)';
-        yOut = interp1(t-t(locs{3}(2)), y, tOut);
+        yOut = interp1(t-t(locs{4}(2)), y, tOut);
     else
+        idx = find(t < 0.1*maxTime, 1, 'last');
+        [~,maxIdx] = max(y(1:idx,4));
         tOut = (0:3600:maxTime*0.9)';
-        yOut = interp1(t, y, tOut);
+        yOut = interp1(t-t(maxIdx), y, tOut);
     end
     rawOutput = {t, y, ySS};
 end

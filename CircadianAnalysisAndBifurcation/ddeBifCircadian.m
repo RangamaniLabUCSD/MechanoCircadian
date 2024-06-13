@@ -4,15 +4,15 @@
 
 bifFig = figure;
 hold on
-p0 = [12*3600; 2; 1/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 1/3600; .5; 0.4/3600;...
+p0 = [12*3600; 2; 0.01/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 0.1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
-    100; 1; 10; 2; 2];
+    100; 1; 10; 2; 2; 1/3600; 0.1; 0.4/3600; 7.5*3600; .05/3600; 1; .05/3600; 1; 2; 2; 2];
 if ~exist('myBayesianAnalysis','var')
     error('Load in myBayesianAnalysis first')
 end
-uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP','burnIn',1000)
+uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP','burnIn',500)
 modeVals = myBayesianAnalysis.Results.PostProc.PointEstimate.X{1};
-fixedParam = [2, 8, 14, 17, 22, 25];
+fixedParam = [5, 14, 17, 22, 25, 44, 45];
 varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 pSol = p0;
@@ -22,30 +22,36 @@ par(:) = pSol;
 par(29:30) = [2, 2];
 par(1) = par(1)/3600;
 par(7) = par(7)/3600;
-par([3,5,6,9,11]) = par([3,5,6,9,11])*3600; 
+par(38) = par(38)/3600;
+par([3,5,6,9,11,35,37]) = par([3,5,6,9,11,35,37])*3600; 
 funcs=set_funcs(...
-    'sys_rhs', @circadian_rhs,...
-    'sys_tau',@()[1,7]);%tau is the first parameter in the parameter vector,...
+    'sys_rhs', @circadian_rhs_new,...
+    'sys_tau',@()[1,7,38]);%tau is the first parameter in the parameter vector,...
 
 % define different parameter values to test
-KdBPVals = [1,0,.1,.3,1,1,1,1,1,1]*par(5); % KdBP (p(5))
-KdBVals = [1,1,1,1,.1,.3,3,1,1,1]*par(6); % KdB (p(6))
-KdPVals = [1,1,1,1,1,1,1,3,10,30]*par(11); % KdP (p(11))
+KdBVals = par(6)*[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
+KdPVals = par(11)*[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
+KdRVals = par(37)*[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(37))
 % initializations tailored to different parameter changes
-YInit = par(29)*[1,0,.1,.2,1,1.2,4,.2,0,0]; % for 10000
-MInit = par(30)*[2,1,1,1,1,1.2,4,1,1,1]; % for 10000
+YInit = par(29)*[1.5,0.5,2,2,0.4,0.8,4,1.5,1.2,1.2];
+MInit = par(30)*[1.5,0.5,2,2,0.4,0.8,4,1.5,1.2,1.2];
 plotLogic = false; % whether to leave all plots open
-BranchesStored = cell(size(KdBPVals)); % cell to store YAP/TAZ-MRTF bifurcation curves
-for i = 1:length(KdBPVals)
-    par(5) = KdBPVals(i);
+BranchesStored = cell(size(KdBVals)); % cell to store YAP/TAZ-MRTF bifurcation curves
+% nMechVals = [1,1.5,2,3,4.5];
+nMechVals = 2*ones(size(YInit)); %nMech
+for i = 1%:length(KdBVals)
+    % par(3) = 0; % no cyclic BMAL1
     par(6) = KdBVals(i);
     par(11) = KdPVals(i);
+    par(37) = KdRVals(i);
     par(29) = YInit(i);
     par(30) = MInit(i);
+    par(46) = nMechVals(i);
+    
     % compute ss
     stst.kind='stst';
     stst.parameter=par;
-    stst.x = [0.1; 2];
+    stst.x = [0.1; 2; 2];
     flag_newhheur=1; % flag_newhheur=1 is the default choice if this argument is omitted
     method=df_mthod(funcs,'stst',flag_newhheur);
     method.stability.minimal_real_part=-1;
@@ -194,7 +200,7 @@ plot(YAPTAZVals, stabilityVals0*1000,'.')
 prettyGraph
 ylabel('Re(lambda)')
 xlabel('YAP/TAZ N/C')
-xlim([2 6])
+xlim([3 7])
 set(gcf,'renderer','painters')
 
 function y = circadian_rhs(xx,par)
@@ -219,8 +225,53 @@ function y = circadian_rhs(xx,par)
     Mtot = 1e6;
     YConc = Y*Ytot./(CytoConv + Y*NucConv);
     MConc = M*Mtot./(CytoConv + M*NucConv);
-    KeB2 = 3600*(par(12)*YConc^2/(par(13)^2+YConc^2) + par(23)*MConc^2/(par(24)^2+MConc^2));
-    KeP2 = 3600*(par(15)*MConc^2/(par(16)^2+MConc^2) + par(20)*YConc^2/(par(21)^2+YConc^2));
+    nMech = 2;
+    KeB2 = 3600*(par(12)*YConc^nMech/(par(13)^nMech+YConc^nMech) + ...
+        par(23)*MConc^nMech/(par(24)^nMech+MConc^nMech));
+    KeP2 = 3600*(par(15)*MConc^nMech/(par(16)^nMech+MConc^nMech) +...
+        par(20)*YConc^nMech/(par(21)^nMech+YConc^nMech));
     y = [KeB/(1+(BLag1/KiB)^nB) + KeB2 - KdBP*B*P - KdB*B;
          KeP/(1+(KaP/BLag2)^nP) + KeP2 - KdBP*B*P - KdP*P];
+end
+
+function y = circadian_rhs_new(xx,par)
+    RLag1 = xx(3,2);
+    BLag2 = xx(1,3);
+    PLag2 = xx(2,3);
+    BLag3 = xx(1,4);
+    PLag3 = xx(2,4);
+    B = xx(1,1);
+    P = xx(2,1);
+    R = xx(3,1);
+    nB = par(2);
+    KeB = par(3);
+    KiB = par(4);
+    KdBP = par(5);
+    KdB = par(6);
+    nP0 = par(8);
+    KeP = par(9);
+    KaP = par(10);
+    KdP = par(11);
+    Y = par(29);
+    M = par(30);
+    KeP0_self = par(35);
+    KiP = par(36);
+    KdR = par(37);
+    nP1 = par(43);
+    CytoConv = 1.3851e6;
+    NucConv = 3.3122e5;
+    Ytot = 1.4784e6;
+    Mtot = 1e6;
+    YConc = Y*Ytot./(CytoConv + Y*NucConv);
+    MConc = M*Mtot./(CytoConv + M*NucConv);
+    nMech = par(46);
+    KeB2 = 3600*(par(12)*YConc^nMech/(par(13)^nMech+YConc^nMech) +...
+        par(23)*MConc^nMech/(par(24)^nMech+MConc^nMech));
+    KeP2 = 3600*(par(15)*MConc^nMech/(par(16)^nMech+MConc^nMech) +...
+        par(20)*YConc^nMech/(par(21)^nMech+YConc^nMech));
+    KeR2 = 3600*(par(41)*MConc^nMech/(par(42)^nMech+MConc^nMech) +... 
+        par(39)*YConc^nMech/(par(40)^nMech+YConc^nMech));
+    y = [KeB/(1+(RLag1/KiB)^nB) + KeB2 - KdB*B;
+         KeP/(1+(KaP/BLag2)^nP0) + KeP0_self/(1+(PLag2/KiP)^nP1) + KeP2 - KdP*P;
+         KeP/(1+(KaP/BLag3)^nP0) + KeP0_self/(1+(PLag3/KiP)^nP1) + KeR2 - KdR*R];
 end
