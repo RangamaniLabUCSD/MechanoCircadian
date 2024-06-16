@@ -107,7 +107,7 @@ meanVals = myBayesianAnalysis.Results.PostProc.Percentiles.Mean;
 uq_postProcessInversionMCMC(myBayesianAnalysis,'PointEstimate','MAP')
 modeVals = myBayesianAnalysis.Results.PostProc.PointEstimate.X{1};
 pSol = p0;
-pSol(varyLogic) = pSol(varyLogic) .* modeVals';
+pSol(varyLogic) = pSol(varyLogic) .* modeVals'; %#ok<NASGU>
 save('bayesianAnalysis_RBPFinal_5001to10000_varypExp_weightPeriod100.mat','myBayesianAnalysis')
 
 %% Test convergence of MCMC 
@@ -304,7 +304,7 @@ legendEntries = {'Control','0.1μM Jas','0.2μM Jas','0.5μM Jas'};
 [periodJas, amplJas] = plotConditions(paramMat, testsMat, plotDynMat, expDataCell, legendEntries);
 
 %% Total summary
-spaghetti = true; % optional - plot individual sample curves (spaghetti plot)
+spaghetti = false; % optional - plot individual sample curves (spaghetti plot)
 figure
 testsCell = {stiffnessTests, ROCKInhibTests, CytDTests, LatBTests, JasTests};
 periodCell = {periodStiffness, periodROCKInhib, periodCytD, periodLatB, periodJas};
@@ -570,7 +570,7 @@ function LL = computeLogLikelihood(pCur, data, varargin)
         0, 0, 0, 0,...
         0, 0, 0,...
         0, 0.1, 0.2, 0.5];
-    expMeanDyn = dataVec(1:length(JasTests), :); %#ok<PFBNS>
+    expMeanDyn = dataVec(1:length(JasTests), :);
     expStdDyn = dataVec(length(JasTests)+1:end, :);
     amplTest = zeros(size(JasTests));
 
@@ -584,11 +584,6 @@ function LL = computeLogLikelihood(pCur, data, varargin)
         inhibVec = [kra_cur, ROCKLevel, 1, 0, CytDTests(i)]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC), CytD]
         inhibVec(6:9) = [1,1,3000,1];
         [periodCur, amplCur, t, y] = conditionToOutputs(pCur, stiffnessTests(i), inhibVec);
-        % if i == 3
-        %     testIdx = find(t > 60*60*24);
-        %     relControlAmplB = range(y(testIdx,1))/min(y(testIdx,1));%amplCur(1)/min(y(:,1));
-        %     relControlAmplP = range(y(testIdx,2))/min(y(testIdx,2));%amplCur(2)/min(y(:,2));
-        % end
         amplTest(i) = amplCur(4);
         periodVals(i) = periodCur(4);
         oscDynamics = y(:,4);
@@ -596,7 +591,7 @@ function LL = computeLogLikelihood(pCur, data, varargin)
         minVals(i) = min(oscDynamics);
     end
     amplTest([4,7,11,14]) = amplTest(1); % all control cases
-    minVals([4,7,11,14]) = minVals(1);
+    % minVals([4,7,11,14]) = minVals(1);
     periodVals([4,7,11,14]) = periodVals(1);
     amplTestRaw = amplTest;
     % amplTest = amplTest/amplTest(1); % normalize to control amplitude
@@ -607,17 +602,16 @@ function LL = computeLogLikelihood(pCur, data, varargin)
 
     LLvec = zeros(size(JasTests));
     % nVec = [4,4,4,3,3,3,3,3,3,3,3,3,3,3,3,3,3];
-    % figure
     if plotLogic
         figure
     end
-    sumAll = 0;
-    lenAll = 0;
-    for i = 1:length(JasTests)
-        sumAll = sumAll + sum(modelStored{i}(:,2)); 
-        lenAll = lenAll + length(modelStored{i}(:,2));
-    end
-    meanAll = sumAll/lenAll;
+    % sumAll = 0;
+    % lenAll = 0;
+    % for i = 1:length(JasTests)
+    %     sumAll = sumAll + sum(modelStored{i}(:,2)); 
+    %     lenAll = lenAll + length(modelStored{i}(:,2));
+    % end
+    % meanAll = sumAll/lenAll;
     for i = 1:length(JasTests)
         yNormalized = (modelStored{i}(:,2) - mean(modelStored{i}(:,2)))/amplTestRaw(1);
         % yNormalized = (modelStored{i}(:,2) - min(minVals))/amplTestRaw(1);
@@ -637,14 +631,9 @@ function LL = computeLogLikelihood(pCur, data, varargin)
         end
     end
     LL = sum(LLvec);
+    % add extra penalty term (see Methods in paper)
     weightPeriod = 100;
     LL = LL - weightPeriod*sum(((periodVals/3600-periodVec)./periodStdVec).^2);
-    % if relControlAmplB > 0.2 || relControlAmplP < 0.5
-    %     LL = -1e7;
-    % else
-    % LL = LL - 1e6*(relControlAmplB-0.1)^2 - ...
-    %     1e6*(relControlAmplP-1.0)^2;
-    % end
 end
 
 function [periodTests, amplTests] = plotConditions(paramMat, testsMat, plotDynMat, expDataCell, legendEntries)

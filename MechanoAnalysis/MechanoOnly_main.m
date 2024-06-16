@@ -58,9 +58,9 @@ for i = 1:length(cytDVals)
     stiffnessVec = [1e7,inf,0];
     SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
     MRTFEq(i) = SSVar(25)/SSVar(26);
-    FActinEq(i) = SSVar(5);
-    GActinEq(i) = SSVar(9);
-    NPCAEq(i) = SSVar(8);
+    % FActinEq(i) = SSVar(5);
+    % GActinEq(i) = SSVar(9);
+    % NPCAEq(i) = SSVar(8);
 end
 figure
 plot(cytDVals,MRTFEq)

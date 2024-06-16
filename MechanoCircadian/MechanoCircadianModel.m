@@ -11,21 +11,20 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 %       element) and the time scale of stiffness increase in s (second el)
 %       only stiffnessParam(1) is used here (stiffness is assumed to be
 %       equal to this value at SS)
-%
-%     * pSol: parameter solution vector - length 34, contains all calibrated
-%       values from mechano-Circadian model (see Tables 1-2 in paper). Note
-%       that nB, nP, nYB, nMP, nYP, and nMB are all Hill coefficients that were
-%       not included in parameter estimation, but were fixed at 2.0.
-%       In order, the parameters are:
-%       {'tauB','nB','KeB0','KiB','KdBP','KdB',...
-%       'tauP','nP','KeP0','KaP','KdP',...
-%       'KeB2,Y','KYB','nYB','KeP2,M','KMP','nMP'...
-%       'ROCKInhibSens', 'StiffThresh',...
-%       'KeP2,Y','KYP','nYP','KeB2,M','KMB','nMB',...
-%       'LatBSens','JasMag','JasSens','KdLuc',...
-%       'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap'};
-%
-%     * inhibVec: vector of inhibition parameters (length=9)
+% INPUTS:
+%     * pSol: parameter solution vector - length 45, contains all calibrated
+%           values from mechano-Circadian model (see Tables S1 and S4 in paper).
+%           In order, the parameters are:
+%            {'tauB','nB','KeB0','KiB','KdBP','KdB',...
+%             'tauP','nP0','KeP0','KaP','KdP',...
+%             'KeB2,Y','KYB','nYB','KeP2,M','KMP','nMP'...
+%             'ROCKInhibSens', 'StiffThresh',...
+%             'KeP2,Y','KYP','nYP','KeB2,M','KMB','nMB',...
+%             'LatBSens','JasMag','JasSens','KdLuc',...
+%             'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap',...
+%             'KeP1', 'KiP', 'KdR', 'tauR',...
+%             'KeR2,Y', 'KYR', 'KeR2,M', 'KMR', 'nP1', 'nYR', 'nMR'};
+%       * inhibVec: vector of inhibition parameters (length=9 or 10)
 %           1: actin polym inhibition: factor multiplying kra
 %           2: ROCK inhibition: factor multiplying param 55, 69 (epsilon and tau - ROCK mediated catalysis)
 %           3: MRTF-Circadian coupling inhibition - factor multiplying
@@ -37,9 +36,17 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 %           dephos) and param(86) (rate of stress fiber-dependent nuclear pore opening)
 %           8: cell contact area (in microns squared, control area is 3000)
 %           9: lamin A mutation - factor multiplying lamin A phos rate (krl)
+%           10: (optional) lamin A mutation - factor multiplying NPC opening rate (KfNPC)
 %
-%     * popVar (optional) - either length of 105 (total # of parameters
-%       to vary) or scalar corresponding to population variance
+%       Additionally, we have the following optional arguments (set to
+%       defaults if not provided)
+%       * popVar: either length of 105 (total # of parameters
+%           to vary) or scalar corresponding to population variance
+%           (default is 0)
+%       * noiseLevel: noise parameters associated with SDDE implementation
+%           [noiseB, noiseP, noiseR], default is [0,0,0]
+%       * Ke3: baseline expression independent of YAP/TAZ and MRTF
+%           [Ke3_B, Ke3_P, Ke3_R], default is [0,0,0]
 
 %
 % output:
@@ -135,19 +142,6 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     end
 
     fsolveOptions = optimoptions('fsolve','Display','off','OptimalityTolerance',1e-12);
-    % unstableSS = [0,0,0];
-    % startTime = tic;
-    % try DDE_SS = dde23(@ddefun_YAPSS_alt, lags, @history_CircOnly_alt, [0, 2*24*3600]);
-    %     avgLogic = DDE_SS.x > 24*3600;
-    %     initGuess = [mean(DDE_SS.y(1,avgLogic)), mean(DDE_SS.y(2,avgLogic)), mean(DDE_SS.y(3,avgLogic))];
-    % catch
-    %     initGuess = [0, 0, 0];
-    % end
-    % unstableSS = initGuess;
-    % unstableSS = fsolve(@(ss) [KeB/(1+(ss(1)/KiB)^pExpB) + KeB2 - KdBP*ss(1)*ss(2) - KdB*ss(1);
-    %                            KeP/(1+(KaP/ss(1))^pExpP) + KeP2 - KdBP*ss(1)*ss(2) - KdP*ss(2)],...
-    %             [0.1,0.1], fsolveOptions);
-    % unstableSS(3) = 0;
     initGuess = [1, 1, 1];
     unstableSS = fsolve(@(ss) [KeB/(1+(ss(3)/KiB)^pExpB) + KeB2 - KdB*ss(1);
                                KeP/(1+(KaP/ss(1))^pExpP0) + KeP0_self*(1./(1+(ss(2)/KiP).^pExpP1)) + KeP2 - KdP*ss(2);
@@ -169,7 +163,7 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
             t = (timeSpan(1):3600:timeSpan(end))';
             y = zeros(length(t), 4);
         end
-    elseif all(noiseLevel > 0)
+    else
         error('Stochastic version not currently supported')
     end
 

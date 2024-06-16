@@ -4,6 +4,7 @@
 
 bifFig = figure;
 hold on
+% load p0 from myBayesianAnalysis (Bayesian parameter est results)
 p0 = [12*3600; 2; 0.01/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 0.1/3600; .5; 0.4/3600;...
     0.05/3600; 1; 2; .05/3600; 1; 2; 10; 3.25; .05/3600; 1; 2; .05/3600; 1; 2; 0.2; 2; 0.1; log(2)/(2*3600);...
     100; 1; 10; 2; 2; 1/3600; 0.1; 0.4/3600; 7.5*3600; .05/3600; 1; .05/3600; 1; 2; 2; 2];
@@ -25,22 +26,32 @@ par(7) = par(7)/3600;
 par(38) = par(38)/3600;
 par([3,5,6,9,11,35,37]) = par([3,5,6,9,11,35,37])*3600; 
 funcs=set_funcs(...
-    'sys_rhs', @circadian_rhs_new,...
+    'sys_rhs', @circadian_rhs,...
     'sys_tau',@()[1,7,38]);%tau is the first parameter in the parameter vector,...
 
+nCoupleTest = false; % test different values of the Hill coefficient for mechanotransduction-circadian coupling
+KdTest = true; % test different values for decay rates in circadian model
 % define different parameter values to test
-KdBVals = par(6)*[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
-KdPVals = par(11)*[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
-KdRVals = par(37)*[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(37))
-% initializations tailored to different parameter changes
-YInit = par(29)*[1.5,0.5,2,2,0.4,0.8,4,1.5,1.2,1.2];
-MInit = par(30)*[1.5,0.5,2,2,0.4,0.8,4,1.5,1.2,1.2];
+if KdTest
+    KdBVals = par(6)*[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
+    KdPVals = par(11)*[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
+    KdRVals = par(37)*[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(37))
+    % initializations tailored to different parameter changes
+    YInit = par(29)*[1.5,0.5,2,2,0.4,0.8,4,1.5,1.2,1.2];
+    MInit = par(30)*[1.5,0.5,2,2,0.4,0.8,4,1.5,1.2,1.2];
+    nMechVals = 2*ones(size(YInit)); %nMech
+elseif nCoupleTest %#ok<UNRCH>
+    nMechVals = [1,1.5,2,3,4.5];
+    KdBVals = par(6)*ones(size(nMechVals)); % KdB (p(6))
+    KdPVals = par(11)*ones(size(nMechVals)); % KdP (p(11))
+    KdRVals = par(37)*ones(size(nMechVals)); % KdR (p(37))
+    % initializations tailored to different parameter changes
+    YInit = par(29)*1.5*ones(size(nMechVals));
+    MInit = par(30)*1.5*ones(size(nMechVals));
+end
 plotLogic = false; % whether to leave all plots open
 BranchesStored = cell(size(KdBVals)); % cell to store YAP/TAZ-MRTF bifurcation curves
-% nMechVals = [1,1.5,2,3,4.5];
-nMechVals = 2*ones(size(YInit)); %nMech
-for i = 1%:length(KdBVals)
-    % par(3) = 0; % no cyclic BMAL1
+for i = 1:length(KdBVals)
     par(6) = KdBVals(i);
     par(11) = KdPVals(i);
     par(37) = KdRVals(i);
@@ -157,84 +168,9 @@ for i = 1%:length(KdBVals)
     BranchesStored{i} = {YBranch, MBranch};
 end
 
-%% continuation of periodic orbits
-intervals=40;
-degree=4;
-[psol,stepcond]=p_topsol(funcs,first_hopf,1e-2,degree,intervals);
-% correct periodic solution guess:
-method=df_mthod(funcs,'psol');
-[psol,success]=p_correc(funcs,psol,4,stepcond,method.point);
-branch4=df_brnch(funcs,ind_Y,'psol'); % empty branch:
-branch4.parameter.min_bound(1,:)=[ind_Y 0];
-branch4.parameter.max_bound(1,:)=[ind_Y 50];
-branch4.parameter.max_step(1,:)=[ind_Y .02];
-% make degenerate periodic solution with amplitude zero at hopf point:
-deg_psol=p_topsol(funcs,first_hopf,0,degree,intervals);
-% use deg_psol and psol as first two points on branch:
-deg_psol.mesh=[];
-branch4.point=deg_psol;
-psol.mesh=[];
-branch4.point(2)=psol;
-figure; clf;
-[branch4,s,f,r]=br_contn(funcs,branch4,50); % compute periodic solutions branch
-xlabel('stiffness');ylabel('amplitude');
-[xm,ym]=df_measr(0,branch4);
-ym.field='period';
-ym.col=1;
-figure
-br_plot(branch4,xm,ym,'b');% look at the period along the branch:
-
-%% plot stability vs. YAP/TAZ value (for fig S4)
-curBranch = branch1;
-branchLength = length(branch1.point);
-YAPTAZVals = zeros(branchLength,1);
-stabilityVals0 = zeros(branchLength,1);
-stabilityVals1 = zeros(branchLength,1);
-for i = 1:branchLength
-    YAPTAZVals(i) = curBranch.point(i).parameter(29);
-    [stabilityVals0(i),idx] = max(real(curBranch.point(i).stability.l0));
-    stabilityVals1(i) = real(curBranch.point(i).stability.l1(idx));
-end
-figure
-plot(YAPTAZVals, stabilityVals0*1000,'.')
-prettyGraph
-ylabel('Re(lambda)')
-xlabel('YAP/TAZ N/C')
-xlim([3 7])
-set(gcf,'renderer','painters')
-
+% define right-hand-side (RHS) for circadian system (rates of change for
+% each variable)
 function y = circadian_rhs(xx,par)
-    BLag1 = xx(1,2);
-    BLag2 = xx(1,3);
-    B = xx(1,1);
-    P = xx(2,1);
-    nB = par(2);
-    KeB = par(3);
-    KiB = par(4);
-    KdBP = par(5);
-    KdB = par(6);
-    nP = par(8);
-    KeP = par(9);
-    KaP = par(10);
-    KdP = par(11);
-    Y = par(29);
-    M = par(30);
-    CytoConv = 1.3851e6;
-    NucConv = 3.3122e5;
-    Ytot = 1.4784e6;
-    Mtot = 1e6;
-    YConc = Y*Ytot./(CytoConv + Y*NucConv);
-    MConc = M*Mtot./(CytoConv + M*NucConv);
-    nMech = 2;
-    KeB2 = 3600*(par(12)*YConc^nMech/(par(13)^nMech+YConc^nMech) + ...
-        par(23)*MConc^nMech/(par(24)^nMech+MConc^nMech));
-    KeP2 = 3600*(par(15)*MConc^nMech/(par(16)^nMech+MConc^nMech) +...
-        par(20)*YConc^nMech/(par(21)^nMech+YConc^nMech));
-    y = [KeB/(1+(BLag1/KiB)^nB) + KeB2 - KdBP*B*P - KdB*B;
-         KeP/(1+(KaP/BLag2)^nP) + KeP2 - KdBP*B*P - KdP*P];
-end
-
-function y = circadian_rhs_new(xx,par)
     RLag1 = xx(3,2);
     BLag2 = xx(1,3);
     PLag2 = xx(2,3);
@@ -246,7 +182,7 @@ function y = circadian_rhs_new(xx,par)
     nB = par(2);
     KeB = par(3);
     KiB = par(4);
-    KdBP = par(5);
+    % KdBP = par(5);
     KdB = par(6);
     nP0 = par(8);
     KeP = par(9);

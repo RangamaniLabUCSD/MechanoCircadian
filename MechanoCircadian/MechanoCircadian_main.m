@@ -43,6 +43,7 @@ for i = 1:length(stiffnessVals)
     LATSFactor = 1;
     inhibVec = [actinInhib, ROCKInhib, MRTFInhib, YAPOverexpress, cytoDConc, LATSFactor]; %[actin polym (kra), ROCK, MRTF, YAP phosphorylation (kNC)]
     inhibVec(7:9) = [1,3000,1];
+    inhibVec(10) = 1; % LaminA overexpression / increased NPC opening rate (1 is control / wild type)
     [periodCur, amplitudeCur, tOut, yOut, rawOutput,oscDecayRateCur] = conditionToOutputs(pSol,stiffnessVals(i),inhibVec,maxTime,0,noiseLevel);
     period(i) = periodCur(3);
     amplitude(i) = amplitudeCur(3);
@@ -50,9 +51,9 @@ for i = 1:length(stiffnessVals)
     T = rawOutput{1};
     Y = rawOutput{2};
     ySS = rawOutput{3};
-    oscVarIdx = 3;
+    oscVarIdx = 2; % which variable to plot
     if mod(i-1,1)==0 % plot certain cases
-        refConc = 1;%%13.5;
+        refConc = 1;
         oscDynamics = Y(:,oscVarIdx);
         [~,locs] = findpeaks(oscDynamics);
         if length(locs)<2
@@ -121,16 +122,10 @@ plot((t)/3600 - tShift, refConcP*(KeP)*3600, 'LineWidth', 1.5)
 xlabel('Time (hr)')
 ylabel({'PER/CRY expr.','rate (nM/hr)'})
 ylim([0 2.1*refConcP])
-% hold on
-% yyaxis right
-% % plot((t+pSol(7))/3600 - tShift, refConc*(KeP+KeP2)*3600, 'LineWidth', 1.5)
-% plot((t)/3600 - tShift, refConc*(KeP)*3600, 'LineWidth', 1.5)
-% ylim([0 2.5*refConc])
-% ylabel({'PER/CRY expr.','rate (nM/hr)'})
 xlim([0 48])
 prettyGraph
 
-%%
+%% Single dynamics plot (Fig 1B)
 figure
 plot(t/(3600*24) - tShift/24, y(:,1)/BNorm, 'LineWidth', 1.5)
 hold on
@@ -142,13 +137,17 @@ ylabel('Normalized conc.')
 xlim([0 5])
 prettyGraph
 
-%% generate populations for Figs 4-5
+%% generate populations for Figs 4-6, Fig S5
 fig4 = false;
-fig5 = true;
-altMutantTest = false;
+fig5 = false;
+altMutantTest = true;
+% To generate populations for Figure 6, set fig4=true and choose either
+% mutant YAP or mutant Lamin below
+% For alt version of Figure 5 shown in Figure S4, set fig5=true and softKe3
+% to true
 mutantYAP = false;
 mutantLamin = false;
-softKe3 = true;
+softKe3 = false;
 if fig5
     stiffnessVals = [30, 0.3, 30, 30, 30, 30, 30, 30, 30]; %#ok<*UNRCH>
     cytDConc = [0, 0, 1, 0, 0, 0, 0, 0, 0];
@@ -455,24 +454,9 @@ legend(conditionsStrings(inclIdx))
 xlabel('MRTF N/C')
 ylabel('Circadian power fraction')
 
-%% load color map 
-% (this is tailored to a single json (inferno) currently, 
-% would need to be edited for loading in other color maps)
-[json_file,json_path] = uigetfile('*.json','Select json file with color map');
-json_file = fullfile(json_path,json_file);
-load_colors = readcell(json_file,'FileType','text');
-RGBPoints = cell2mat(load_colors(16:1039));
-RGBPoints = reshape(RGBPoints',[4, length(RGBPoints)/4]);
-dataVals = RGBPoints(1,:);
-dataInterp = dataVals(1):(dataVals(end)-dataVals(1))/1000:dataVals(end);
-RGBVals = RGBPoints(2:4,:);
-RInterp = interp1(dataVals,RGBVals(1,:),dataInterp);
-GInterp = interp1(dataVals,RGBVals(2,:),dataInterp);
-BInterp = interp1(dataVals,RGBVals(3,:),dataInterp);
-RGBInterp = vertcat(RInterp,GInterp,BInterp);
-
 %% plot population dynamics in heat maps
 figure
+abenzaPlot = true;
 plotIdx = [1,2];
 for i = 1:length(plotIdx)
     subplot(1,length(plotIdx),i)
@@ -481,23 +465,14 @@ for i = 1:length(plotIdx)
     ylim([0 200])
     xticks(1+4*24*[0, 1, 2, 3, 4, 5, 6, 7])
     xticklabels({'0','1','2','3','4','5','6','7'})
-    colormap(RGBInterp(:,150:end)')
+    if abenzaPlot
+        colormap(loadInferno())
+    end
     clim([0 0.7])
     xlim([0 4*3.05*24])
     prettyGraph
     ylabel('Cell number')
     xlabel('Time (days)')
-end
-
-%% average population dynamics
-Fs = 1/(15*60); % match experiment case of measuring every 15 minutes
-tInterp = 0:1/(3600*Fs):960;
-figure
-hold on
-for i = 1:length(popSeq)
-    meanDyn = mean(popSeq{i}{1});
-    plot(tInterp,meanDyn)
-    popSeq{i}{10} = meanDyn;
 end
 
 %% Compare mutant results
@@ -545,70 +520,6 @@ m_MRTF = multcompare(aov_MRTF)
 m_power = multcompare(aov_power)
 % aov_oscDecay = anova(oscDecayMat)
 % m_oscDecay = multcompare(aov_oscDecay)
-
-%% movie of population-level oscillations
-figure
-curOscMat = popSeq{2}{1}*13.5;
-for i = 1:size(curOscMat,1)
-    curOscMat(i,:) = smooth(curOscMat(i,:),9);
-end
-
-xCellLocs = 0:20;
-yCellLocs = 0:20;
-[xCellLocs, yCellLocs] = meshgrid(xCellLocs, yCellLocs);
-xCellLocs = xCellLocs(:) + 0.2*randn(size(xCellLocs(:)));
-yCellLocs = yCellLocs(:) + 0.2*randn(size(yCellLocs(:)));
-colorMap = parula(256);
-numCells = length(yCellLocs);
-
-saveVid = true;
-if saveVid
-    frameRate = 20;
-    path = uigetdir('','Choose where to save video');
-    myVideo = VideoWriter(fullfile(path,'YAPMutantPop_softSubstrate.mp4'),'MPEG-4');
-    myVideo.FrameRate = frameRate;
-    open(myVideo)
-end
-
-for i = 1:4:4*24*14+1%size(curOscMat,2)
-    curOscVals = curOscMat(1:numCells,i);
-    colorIdx = round(255*curOscVals/60) + 1;
-    colorIdx(colorIdx > 256) = 256;
-    scatter(xCellLocs, yCellLocs, 20*ones(size(xCellLocs)), colorMap(colorIdx,:), "filled")
-    xlim([-1 21])
-    ylim([-1 21])
-    prettyGraph
-    title(sprintf('t = %.2f days',(i-1)*0.25/24))
-    cb = colorbar;
-    cb.Label.String = 'BMAL1 (nM)'
-    clim([0 60])
-    xticks([])
-    yticks([])
-
-    drawnow
-    if saveVid
-        img = print('-RGBImage','-r300');
-        writeVideo(myVideo, img)
-    end
-end
-
-if saveVid
-    close(myVideo)
-end
-
-%% mutant comparison for single cell with MAP parameters
-stiffnessVals = [300, 300, 300];
-YAPOverexpress = [0, 1, 0]
-laminAPhos = [1, 1, 0];
-maxTime = 3600*480;
-figure
-hold on
-for i = 1:length(stiffnessVals)
-    inhibVec = [1,1,1,YAPOverexpress(i),0,1,1,3000,laminAPhos(i)];
-    [periodCur, amplitudeCur, tOut, yOut] = conditionToOutputs(pSol,stiffnessVals(i),inhibVec,maxTime,0);
-    plot(tOut/3600, yOut(:,2)*13.5)
-end
-prettyGraph
 
 %% mutant comparison on different stiffnesses
 figure
@@ -784,7 +695,7 @@ ylim([0 1])
 ylabel('Circadian power fraction')
 prettyGraph
 
-%% ANOVA and multiple comparisons for mutant results
+%% ANOVA and multiple comparisons for alt mutant results
 YAPTAZMat = [popSeq{1}{12}(:,15), popSeq{2}{12}(:,15), popSeq{3}{12}(:,15),...
     popSeq{4}{12}(:,15), popSeq{5}{12}(:,15), popSeq{6}{12}(:,15),...
     popSeq{7}{12}(:,15), popSeq{8}{12}(:,15), popSeq{9}{12}(:,15)]; 

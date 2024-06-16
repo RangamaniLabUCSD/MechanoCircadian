@@ -1,4 +1,8 @@
 %% two variable DDE model of Circadian oscillations
+% in this file, we model the circadian system with baseline shifts in
+% expression. Together with ddeBifCircadian.m and the
+% mechanotransduction-related functions, this allows us to plot oscillation
+% period and amplitude over the YAP/TAZ-MRTF phase plane.
 
 %% first define pSol
 p0 = [12*3600; 2; 0.01/3600; .04; 0.4/3600; 0.4/3600; 7.5*3600; 2; 0.1/3600; .5; 0.4/3600;...
@@ -14,7 +18,6 @@ varyLogic = true(length(p0),1);
 varyLogic(fixedParam) = false;
 pSol = p0;
 pSol(varyLogic) = pSol(varyLogic) .* modeVals';
-nCirc = 4;
 p = [pSol(1:11); 0; 0; pSol(35:38); 0; pSol(43)]; % init KeB2, KeP2, KeR2 to zero
 
 % convert to units of hours
@@ -23,6 +26,8 @@ p([3,5,6,9,11,14,16]) = p([3,5,6,9,11,14,16])*3600;
 pRef = p;
 
 %% here, we test a range of KeB2 and KeP2 associated with different values of YAP/TAZ and MRTF (see MechanoCircadian.m for full model)
+nCoupleTest = true; % test different values of the Hill coefficient for mechanotransduction-circadian coupling
+KdTest = false; % test different values for decay rates in circadian model
 timeSpan = [0 960];
 YVals = logspace(-1,1.3,20); %40
 MVals = logspace(-1,1.3,20); %40
@@ -42,10 +47,17 @@ KeP2Mat = 3600*(pSol(15)*MConcMat.^nCouple./(pSol(16)^nCouple+MConcMat.^nCouple)
 KeR2Mat = 3600*(pSol(41)*MConcMat.^nCouple./(pSol(42)^nCouple+MConcMat.^nCouple) +...
                 pSol(39)*YConcMat.^nCouple./(pSol(40)^nCouple+YConcMat.^nCouple));
 
-nCoupleVals = [1,1.5,2,3,4.5];
-KdBVals = p(6)*ones(size(nCoupleVals));%[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
-KdPVals = p(11)*ones(size(nCoupleVals));%[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
-KdRVals = p(16)*ones(size(nCoupleVals));%[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(16))
+if nCoupleTest
+    nCoupleVals = [1,1.5,2,3,4.5];
+    KdBVals = p(6)*ones(size(nCoupleVals));%[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
+    KdPVals = p(11)*ones(size(nCoupleVals));%[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
+    KdRVals = p(16)*ones(size(nCoupleVals));%[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(16))
+elseif KdTest %#ok<UNRCH>
+    KdBVals = p(6)*ones(size(nCoupleVals));%[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
+    KdPVals = p(11)*ones(size(nCoupleVals));%[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
+    KdRVals = p(16)*ones(size(nCoupleVals));%[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(16))
+    nCoupleVals = 2*ones(size(KdBVals));
+end
 circStoreCell = cell(size(KdBVals));
 for k = 1:length(KdBVals)
     p(6) = KdBVals(k); p(11) = KdPVals(k); p(16) = KdRVals(k);
@@ -83,9 +95,8 @@ for k = 1:length(KdBVals)
     end
     circStoreCell{k} = {period, amplitude, oscDecayRate};
 end
-save('nMechCircStored.mat','circStoreCell')
 
-%% plot all phase diagrams
+%% plot all phase diagrams after running the KdTest above
 figure
 YVals = logspace(-1,1.3,20); %40
 MVals = logspace(-1,1.3,20); %40
@@ -122,6 +133,7 @@ KeB2Vals = 3600*(pSol(12)*YConcVals.^2./(pSol(13)^2+YConcVals.^2) +...
 KeP2Vals = 3600*(pSol(15)*MConcVals.^2./(pSol(16)^2+MConcVals.^2) +...
                 pSol(20)*YConcVals.^2./(pSol(21)^2+YConcVals.^2));
 
+% also compute total baseline expression in simplified model
 Ke2Vals = KeP2Vals + 3600*pSol(9)./(1 + (pSol(10)*pSol(6)*3600./KeB2Vals).^pSol(8));
 
 %% plot phase diagram with Hopf bifurcation (from running ddeBifCircadian.m)
@@ -131,8 +143,15 @@ YVals = logspace(-1,1.3,20);
 MVals = logspace(-1,1.3,20);
 [YMat, MMat] = meshgrid(YVals, MVals);
 figure
-% surf(YMat, MMat, circStoreCell{1}{1}/3600, 'LineStyle','none','FaceColor','interp')
-surf(YMat, MMat, circStoreCell{1}{2}*7.5, 'LineStyle','none','FaceColor','interp')
+if supplFig
+    surf(YMat, MMat, circStoreCell{1}{2}*7.5, 'LineStyle','none','FaceColor','interp')
+    cmap = loadInferno();
+    cmap = cmap(81:end-80,:);
+elseif fig3 %#ok<UNRCH>
+    surf(YMat, MMat, circStoreCell{1}{1}/3600, 'LineStyle','none','FaceColor','interp')
+    cmap = turbo(256);
+    cmap = cmap(21:end-10,:);
+end
 daspect([1 1 1])
 view([0 90])
 hold on
@@ -141,8 +160,6 @@ xlim([min(YMat(:)) max(YMat(:))])
 ylim([min(MMat(:)) max(MMat(:))])
 prettyGraph
 colorbar
-cmap = turbo(256);
-cmap = cmap(21:end-10,:);
 colormap(cmap)
 
 xlabel('YAP/TAZ N/C')
@@ -154,7 +171,7 @@ set(gca,'YScale','log')
 % paper figure with different treatment cases
 colorOrder = linspecer(8);
 colorOrder = vertcat([0, 0, 0], colorOrder);
-if supplFig
+if supplFig 
     stiffnessVec = [30, 0.3, 30, 30, 30, 30, 30, 30];
     CytDVec = [0, 0, 1, 0, 0, 0, 0, 0];
     LatBVec = [0, 0, 0, 0.2, 0, 0, 0, 0]; %technically LatA
@@ -163,7 +180,7 @@ if supplFig
     JasVec = [0,0,0,0,0,0,0,0];
     contactArea = [3000, 1000, 5000, 600, 1200, 4000, 1600, 900];
     markersVec = {'p','s','s','o','o','+','+','x'};
-else
+elseif fig3 %#ok<UNRCH>
     CytDVec = [0, 0, 0, 2, 5, 0, 0, 0];
     LatBVec = [0, 0, 0, 0, 0, 0, 0, 2];
     JasVec = [0, 0, 0, 0, 0, .1, .5, 0];
@@ -223,7 +240,12 @@ set(gcf,'renderer','painters')
 %% plot all bifurcation diagrams
 figure
 spCount = 0;
-for i = 1:5%[2,4,6,7,8,9]
+if nCoupleTest 
+    idx = 1:5;
+elseif KdTest %#ok<UNRCH>
+    idx = [2,4,6,7,8,9]
+end
+for i = idx
     spCount = spCount + 1;
     subplot(3,2,spCount)
     oscPeriod = circStoreCell{i}{1}/3600;
@@ -244,7 +266,7 @@ for i = 1:5%[2,4,6,7,8,9]
     cmap = turbo(256);
     % cmap = cmap + (1-cmap)*.15;
     cmap = cmap(21:end-10,:);
-    cmap = vertcat([.7,.7,.7],cmap);
+    cmap = vertcat([.7,.7,.7],cmap); %#ok<AGROW>
     colormap(cmap)
     
     xlabel('YAP/TAZ N/C')
@@ -266,9 +288,9 @@ pExp = 4;
 tauB = p(1); pExpB = pExp; KeB = p(3);
 KiB = p(4); KdBP = p(5); KdB = p(6);
 tauP = p(7); pExpP0 = pExp; KeP = p(9);
-KaP = p(10); KdP = p(11); KeB2 = p(12);
-KeP2 = p(13); KeP1 = p(14); KiP = p(15);
-KdR = p(16); tauR = p(17); KeR2 = p(18);
+KaP = p(10); KdP = p(11);
+KeP1 = p(14); KiP = p(15);
+KdR = p(16); tauR = p(17); 
 pExpP1 = pExp;
 KeB2 = 0.01;
 KeR2 = 0.01;
@@ -288,12 +310,13 @@ PStarApprox = (KeP1*KiP^pExp/KdP)^(1/(pExp+1)) + (1/((pExp+1)*KdP))*(KeP2 + KeP/
 hold on
 plot(KeP2, PStarApprox, '--')
 
+% Functions defining the DDE system
 function [t,y] = DDESolve2(timeSpan,p)
     tauB = p(1);    
     pExpB = p(2);
     KeB = p(3);
     KiB = p(4);
-    KdBP = p(5);
+    % KdBP = p(5);
     KdB = p(6);
     tauP = p(7);
     pExpP0 = p(8);
@@ -318,7 +341,7 @@ function [t,y] = DDESolve2(timeSpan,p)
     t = DDESol.x';
     y = DDESol.y';
 
-    function dy = ddefun(t,y,Z)
+    function dy = ddefun(~,y,Z)
         RLag1 = Z(3,1);
         BLag2 = Z(1,2);
         PLag2 = Z(2,2);
@@ -332,7 +355,7 @@ function [t,y] = DDESolve2(timeSpan,p)
               KeP/(1+(KaP/BLag3)^pExpP0) + KeP1/(1+(PLag3/KiP)^pExpP1) + KeR2 - KdR*R];
     end
     
-    function s = history(t)
+    function s = history(~)
         s = [5*ssVals(1); 0.2*ssVals(2); 1*ssVals(3)];
     end
 end

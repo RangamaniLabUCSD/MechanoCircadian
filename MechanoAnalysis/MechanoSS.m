@@ -19,6 +19,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     %           dephos) and param(86) (rate of stress fiber-dependent nuclear pore opening)
     %       8: cell contact area (in microns squared, control area is 3000)
     %       9: lamin A mutation - factor multiplying lamin A phos rate (krl)
+    %       10: (optional) lamin A mutation - factor specifying increased NPC opening rate (KfNPC)
     %
     %     pSol: parameter solution vector (see full list in
     %     MechanoCircadianModel function)
@@ -31,6 +32,9 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     %   SSVar: SS values for all state variables
     %   tauVals: characteristic time scale computed for each variable
 
+    if length(inhibVec)==9
+        inhibVec(10) = 1;
+    end
     if isempty(varargin)
         popVar = 0;
     elseif length(varargin)==1
@@ -159,6 +163,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     param(46) = inhibVec(7)*param(46); % inhibit actin-myosin interactions (blebbistatin) - NPC opening
     param([5,97]) = inhibVec(8)*param([5,97])/3000; % account for contact area
     param(52) = inhibVec(9)*param(52); % inhibit phosph. of LaminA
+    param(88) = inhibVec(10)*param(88);		% perturb expression level of LaminA
     
     param(113) = pSol(30); %MRTFReleaseConst
     param(106) = 1e6; %MRTFTot
@@ -166,6 +171,11 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     param(108) = pSol(32); %Kin2_MRTF
     param(109) = pSol(34); %Kcap (cytoD-dependent F actin capping rate)
     param(110) = pSol(33); %Kdim (cytoD-dependent G actin dimerization rate)
+
+    % define baselines for 5SA-YAP overexpression (should be independent from normal YAP expression)
+    param(114) = param(4); % param(4) is 'YAPTAZnuc_init_uM', param(114) is now the baseline nuclear conc of 5SA-YAP
+    param(115) = param(56); % param(56) is 'YAPTAZP_init_uM', param(115) is now the baseline cytosolic conc of P 5SA-YAP
+    param(116) = param(98); % param(98) is 'YAPTAZN_init_uM', param(116) is now the baseline cytosolic conc of NP 5SA-YAP
 
     % introduce variability in parameters (all rate constants and
     % concentrations except calibrated MRTF parameters, those are sampled
@@ -296,6 +306,10 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     Kdim = p(110);
     foldYAPOverexpress = p(112);
     MRTFReleaseConst = p(113);
+
+    YAP5SA_nuc = param(114);
+    YAP5SA_P = param(115);
+    YAP5SA_NP = param(116);
 	
     %SS calcs
     Faktot = Fak_init_uM + Fakp_init_uM;
@@ -335,6 +349,8 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
                        kcatcof*LIMKA + kmCof*kturnover - kturnover*CofilinTot, ...
                        -kturnover*kmCof*CofilinTot]);
     CofilinNP = CofilinRoots(CofilinRoots > 0);
+    % CofilinCheck = (1/(2*kturnover))*(-kcatcof*LIMKA - kturnover*(kmCof-CofilinTot) +...
+    %     sqrt(kcatcof^2*LIMKA^2 + 2*kcatcof*LIMKA*kturnover*(kmCof-CofilinTot) + kturnover^2*(kmCof+CofilinTot)^2));
     CofilinP = CofilinTot - CofilinNP;
     CofilinTau = (kturnover + kcatcof*LIMKA/kmCof)^(-1);
 
@@ -373,9 +389,13 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     YAPTAZP = YAPTAZCytoTot * YAPTAZPFraction;
     YAPTAZN = YAPTAZCytoTot - YAPTAZP;
     YAPTAZnuc = YAPTAZTot - YAPTAZCytoTot;
+
+    YAP5SATot0 = (YAP5SA_P*CytoConvert + YAP5SA_NP*CytoConvert  + YAP5SA_nuc*NucConvert);
+    % YAPTAZnucCheck = (YAPTAZTot*UnitFactor_uM_um3_molecules_neg_1)*(kinSolo2 + kin2*NPCA)/...
+    %     ((kinSolo2 + kin2*NPCA)*Size_Nuc + kout2*Size_Cyto*(1-YAPTAZPFraction)^(-1));
     if foldYAPOverexpress > 0 % overexpression of YAP mutant
-        YAPTAZTot_5SA = YAPTAZTot*foldYAPOverexpress;
-        kNC_5SA = 0.1*kNC;
+        YAPTAZTot_5SA = YAP5SATot0*foldYAPOverexpress;
+        kNC_5SA = 0;%0.1*kNC;
         YAPTAZPFraction_5SA = (kNC_5SA/(kNC_5SA + kCN + kCY*Fcyto*MyoA)); % rapid phosphorylation
         YAPTAZnucFraction_5SA = (kinSolo2 + kin2*NPCA)/(kout2*Size_Cyto/Size_Nuc + kinSolo2 + kin2*NPCA);
         YAPTAZCytoTot_5SA = YAPTAZTot_5SA / (1 + (1-YAPTAZPFraction_5SA)*YAPTAZnucFraction_5SA/(1-YAPTAZnucFraction_5SA));
