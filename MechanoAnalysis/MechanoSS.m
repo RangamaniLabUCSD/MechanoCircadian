@@ -19,7 +19,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
     %           dephos) and param(86) (rate of stress fiber-dependent nuclear pore opening)
     %       8: cell contact area (in microns squared, control area is 3000)
     %       9: lamin A mutation - factor multiplying lamin A phos rate (krl)
-    %       10: lamin A mutation - overexpression factor
+    %       10: (optional) lamin A mutation - factor specifying increased NPC opening rate (KfNPC)
     %
     %     pSol: parameter solution vector (see full list in
     %     MechanoCircadianModel function)

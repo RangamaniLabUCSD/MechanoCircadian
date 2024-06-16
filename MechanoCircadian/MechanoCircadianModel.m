@@ -11,21 +11,20 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 %       element) and the time scale of stiffness increase in s (second el)
 %       only stiffnessParam(1) is used here (stiffness is assumed to be
 %       equal to this value at SS)
-%
-%     * pSol: parameter solution vector - length 34, contains all calibrated
-%       values from mechano-Circadian model (see Tables 1-2 in paper). Note
-%       that nB, nP, nYB, nMP, nYP, and nMB are all Hill coefficients that were
-%       not included in parameter estimation, but were fixed at 2.0.
-%       In order, the parameters are:
-%       {'tauB','nB','KeB0','KiB','KdBP','KdB',...
-%       'tauP','nP','KeP0','KaP','KdP',...
-%       'KeB2,Y','KYB','nYB','KeP2,M','KMP','nMP'...
-%       'ROCKInhibSens', 'StiffThresh',...
-%       'KeP2,Y','KYP','nYP','KeB2,M','KMB','nMB',...
-%       'LatBSens','JasMag','JasSens','KdLuc',...
-%       'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap'};
-%
-%     * inhibVec: vector of inhibition parameters (length=9)
+% INPUTS:
+%     * pSol: parameter solution vector - length 45, contains all calibrated
+%           values from mechano-Circadian model (see Tables S1 and S4 in paper).
+%           In order, the parameters are:
+%            {'tauB','nB','KeB0','KiB','KdBP','KdB',...
+%             'tauP','nP0','KeP0','KaP','KdP',...
+%             'KeB2,Y','KYB','nYB','KeP2,M','KMP','nMP'...
+%             'ROCKInhibSens', 'StiffThresh',...
+%             'KeP2,Y','KYP','nYP','KeB2,M','KMB','nMB',...
+%             'LatBSens','JasMag','JasSens','KdLuc',...
+%             'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap',...
+%             'KeP1', 'KiP', 'KdR', 'tauR',...
+%             'KeR2,Y', 'KYR', 'KeR2,M', 'KMR', 'nP1', 'nYR', 'nMR'};
+%       * inhibVec: vector of inhibition parameters (length=9 or 10)
 %           1: actin polym inhibition: factor multiplying kra
 %           2: ROCK inhibition: factor multiplying param 55, 69 (epsilon and tau - ROCK mediated catalysis)
 %           3: MRTF-Circadian coupling inhibition - factor multiplying
@@ -37,9 +36,17 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 %           dephos) and param(86) (rate of stress fiber-dependent nuclear pore opening)
 %           8: cell contact area (in microns squared, control area is 3000)
 %           9: lamin A mutation - factor multiplying lamin A phos rate (krl)
+%           10: (optional) lamin A mutation - factor multiplying NPC opening rate (KfNPC)
 %
-%     * popVar (optional) - either length of 105 (total # of parameters
-%       to vary) or scalar corresponding to population variance
+%       Additionally, we have the following optional arguments (set to
+%       defaults if not provided)
+%       * popVar: either length of 105 (total # of parameters
+%           to vary) or scalar corresponding to population variance
+%           (default is 0)
+%       * noiseLevel: noise parameters associated with SDDE implementation
+%           [noiseB, noiseP, noiseR], default is [0,0,0]
+%       * Ke3: baseline expression independent of YAP/TAZ and MRTF
+%           [Ke3_B, Ke3_P, Ke3_R], default is [0,0,0]
 
 %
 % output:
@@ -51,12 +58,19 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     if isempty(varargin)
         popVar = 0;
         noiseLevel = [0,0];
+        Ke3 = [0,0,0];
     elseif length(varargin)==1
         popVar = varargin{1};
         noiseLevel = [0, 0];
+        Ke3 = [0,0,0];
     elseif length(varargin)==2
         popVar = varargin{1};
         noiseLevel = varargin{2};
+        Ke3 = [0,0,0];
+    elseif length(varargin)==3
+        popVar = varargin{1};
+        noiseLevel = varargin{2};
+        Ke3 = varargin{3};
     end
     
     %Circadian parameters
@@ -64,10 +78,10 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     pExpB = pSol(2);
     KeB = pSol(3);
     KiB = pSol(4);
-    KdBP = pSol(5);
+    % KdBP = pSol(5);
     KdB = pSol(6);
     tauP = pSol(7);
-    pExpP = pSol(8);
+    pExpP0 = pSol(8);
     KeP = pSol(9);
     KaP = pSol(10);
     KdP = pSol(11);
@@ -88,11 +102,24 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 
     KdLuc = pSol(29);
 
+    
+    KeP0_self = pSol(35);
+    KiP = pSol(36);
+    KdR = pSol(37);
+    tauR = pSol(38);
+    pExpP1 = pSol(43);
+    magCouple5 = pSol(39); % for YAP/TAZ coupling to REV-ERBalpha
+    KdCouple5 = pSol(40);
+    nCouple5 = pSol(44);
+    magCouple6 = pSol(41); % for MRTF coupling to REV-ERBalpha
+    KdCouple6 = pSol(42);
+    nCouple6 = pSol(45);
+
     % inhibit MRTF-Circadian coupling if applicable
     magCouple2 = magCouple2 * inhibVec(3);
     magCouple4 = magCouple4 * inhibVec(3);
     
-    lags = [tauB, tauP, 1*3600]; % third is nominal delay (only affects time shift of reporter, can be any delay in general)
+    lags = [tauB, tauP, tauR, 1*3600]; % 4th lag is arbitrary, just determines phase of reporter
 
     SSVals = MechanoSS(stiffnessParam, inhibVec, pSol, popVar);
     YAPTAZnuc_SS = SSVals(15);
@@ -100,40 +127,48 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     mechanoStartEffect = false; % optionally consider effect of YAP/TAZ and MRTF jumping in value after first time lag
     if mechanoStartEffect
         KeB2 = magCouple1 / (1 + (KdCouple1/0.7)^nCouple1) +...
-               magCouple4 / (1 + (KdCouple4/0.301)^nCouple4);
+               magCouple4 / (1 + (KdCouple4/0.301)^nCouple4) + Ke3(1);
         KeP2 = magCouple2 / (1 + (KdCouple2/0.301)^nCouple2) +...
-               magCouple3 / (1 + (KdCouple3/0.7)^nCouple3);
+               magCouple3 / (1 + (KdCouple3/0.7)^nCouple3) + Ke3(2);
+        KeR2 = magCouple5 / (1 + (KdCouple5/0.7)^nCouple5) +...
+               magCouple6 / (1 + (KdCouple6/0.301)^nCouple6) + Ke3(3);
     else
         KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
-               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
+               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4) + Ke3(1);
         KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
-               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
+               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3) + Ke3(2);
+        KeR2 = magCouple5 / (1 + (KdCouple5/YAPTAZnuc_SS)^nCouple5) +...
+               magCouple6 / (1 + (KdCouple6/MRTFnuc_SS)^nCouple6) + Ke3(3);
     end
-    fsolveOptions = optimoptions('fsolve','Display','off');
-    unstableSS = fsolve(@(ss) [KeB/(1+(ss(1)/KiB)^pExpB) + KeB2 - KdBP*ss(1)*ss(2) - KdB*ss(1);
-                               KeP/(1+(KaP/ss(1))^pExpP) + KeP2 - KdBP*ss(1)*ss(2) - KdP*ss(2)],...
-                [0.1,0.1], fsolveOptions);
-    unstableSS(3) = 0;
-    
+
+    fsolveOptions = optimoptions('fsolve','Display','off','OptimalityTolerance',1e-12);
+    initGuess = [1, 1, 1];
+    unstableSS = fsolve(@(ss) [KeB/(1+(ss(3)/KiB)^pExpB) + KeB2 - KdB*ss(1);
+                               KeP/(1+(KaP/ss(1))^pExpP0) + KeP0_self*(1./(1+(ss(2)/KiP).^pExpP1)) + KeP2 - KdP*ss(2);
+                               KeP/(1+(KaP/ss(1))^pExpP0) + KeP0_self*(1./(1+(ss(2)/KiP).^pExpP1)) + KeR2 - KdR*ss(3)],...
+                initGuess, fsolveOptions);
+
+    if any(unstableSS < 0)
+        fprintf("Warning: negative initial condition being set to zero\n")
+        unstableSS(unstableSS < 0) = 0;
+    end
     startTime = tic;
     if all(noiseLevel == 0)
         try DDESol = dde23(@ddefun_YAPSS, lags, @history_CircOnly, timeSpan);
             t = DDESol.x';
             y = DDESol.y';
-            [~, lucInt] = ode15s(@odeLuc, t, 0, odeset(), t, y(:,1));
-            y(:,3) = lucInt';
+            [~, lucInt] = ode15s(@odeLuc, t, 0, odeset(), t, y);
+            y(:,4) = lucInt';
         catch
             t = (timeSpan(1):3600:timeSpan(end))';
-            y = zeros(length(t), 3);
+            y = zeros(length(t), 4);
         end
-    elseif all(noiseLevel > 0)
-        [t, y] = sdde_circadian_solve(noiseLevel(1), noiseLevel(2), noiseLevel(3), lags);
     else
-        error('Noise level must be greater than or equal to zero')
+        error('Stochastic version not currently supported')
     end
 
     function dydt = ddefun_YAPSS(t,y,Z)
-        clockLag1 = Z(1,1);
+        clockLag1 = Z(3,1);%(1,1);
         clockLag2 = Z(1,2);
         if t < lags(1) && mechanoStartEffect
             YAPTAZnuc_B = 0.7;
@@ -149,16 +184,29 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
             YAPTAZnuc_P = YAPTAZnuc_SS;
             MRTFnuc_P = MRTFnuc_SS;
         end
-        % clockLag3 = Z(1,3);
+        if t < lags(3) && mechanoStartEffect
+            YAPTAZnuc_R = 0.7;
+            MRTFnuc_R = .301;
+        else
+            YAPTAZnuc_R = YAPTAZnuc_SS;
+            MRTFnuc_R = MRTFnuc_SS;
+        end
+        clockLag3 = Z(2,2);
+        clockLag4 = Z(1,3);
+        clockLag5 = Z(2,3);
         KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_B)^nCouple1) +...
-               magCouple4 / (1 + (KdCouple4/MRTFnuc_B)^nCouple4);
+               magCouple4 / (1 + (KdCouple4/MRTFnuc_B)^nCouple4) + Ke3(1);
         KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_P)^nCouple2) +...
-               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_P)^nCouple3);
+               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_P)^nCouple3) + Ke3(2);
+        KeR2 = magCouple5 / (1 + (KdCouple5/YAPTAZnuc_R)^nCouple5) +...
+               magCouple6 / (1 + (KdCouple6/MRTFnuc_R)^nCouple6) + Ke3(3);
 
         % Rates (BMAL and PER dynamics)
-        dydt = [KeB*(1./(1+(clockLag1/KiB).^pExpB)) - KdBP*y(1)*y(2) - KdB*y(1) + KeB2;
-                KeP*(1./(1+(KaP/clockLag2).^pExpP)) - KdBP*y(1)*y(2) - KdP*y(2) + KeP2];
-                % KeP*(1./(1+(KaP/clockLag3).^pExpP)) - KdLuc*y(3) + KeP2];
+        dydt = [KeB*(1./(1+(clockLag1/KiB).^pExpB)) - KdB*y(1) + KeB2;
+                KeP*(1./(1+(KaP/clockLag2).^pExpP0)) + KeP0_self*(1./(1+(clockLag3/KiP).^pExpP1)) ...
+                - KdP*y(2) + KeP2;
+                KeP*(1./(1+(KaP/clockLag4).^pExpP0)) + KeP0_self*(1./(1+(clockLag5/KiP).^pExpP1)) ...
+                - KdR*y(3) + KeR2];
         curEval = toc(startTime);
         if curEval > 10 % return error if this instance has taken longer than 10 s to run
             error('Solver took too long')
@@ -166,61 +214,19 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     end
 
     function s = history_CircOnly(~)
-        s = [5*unstableSS(1); 0.2*unstableSS(2)];%; unstableSS(3)];
+        s = [2*unstableSS(1); 0.2*unstableSS(2); unstableSS(3)];
     end
 
-    function dluc = odeLuc(t, luc, tStored, BStored)
-        BCur = interp1(tStored, BStored, t);
-        dluc = KeP*(1./(1+(KaP/BCur).^pExpP)) - KdLuc*luc + KeP2;
-    end
-
-    function [t,y] = sdde_circadian_solve(eps_B, eps_P, eps_L, lags)
-        % solve stochastic version of this system of ddes
-        % not used in the current paper
-
-        KeB2 = magCouple1 / (1 + (KdCouple1/YAPTAZnuc_SS)^nCouple1) +...
-               magCouple4 / (1 + (KdCouple4/MRTFnuc_SS)^nCouple4);
-        KeP2 = magCouple2 / (1 + (KdCouple2/MRTFnuc_SS)^nCouple2) +...
-               magCouple3 / (1 + (KdCouple3/YAPTAZnuc_SS)^nCouple3);
-        dt = 2; % ~2 s time step
-        delayFactor1 = round(lags(1)/dt);
-        delayFactor2 = round(lags(2)/dt);
-        t = (0:dt:timeSpan(2))';
-        y = zeros(length(t),3);
-        y(1,1:2) = history_CircOnly(0);
-        y(1,3) = 0;
-        dy = zeros(1,3);
-        eta_B = 0;
-        eta_P = 0;
-        eta_L = 0;
-        rand_stored = sqrt(dt)*randn(length(t)-1, 3);
-        for i = 2:length(t)
-            eta_B = eta_B - dt*eta_B + eps_B*rand_stored(i-1,1) + 0.5*eps_B^2*(rand_stored(i-1,1)^2-dt);
-            eta_P = eta_P - dt*eta_P + eps_P*rand_stored(i-1,2) + 0.5*eps_P^2*(rand_stored(i-1,2)^2-dt);
-            eta_L = eta_L - dt*eta_L + eps_L*rand_stored(i-1,3) + 0.5*eps_L^2*(rand_stored(i-1,3)^2-dt);
-            % Rates (BMAL and PER dynamics)
-            B = y(i-1,1);
-            P = y(i-1,2);
-            L = y(i-1,3);
-            if t(i-1) < lags(1)
-                BLag1 = y(1,1);
-            else
-                BLag1 = y(i-1-delayFactor1,1);
-            end
-            if t(i-1) < lags(2)
-                BLag2 = y(1,1);
-            else
-                BLag2 = y(i-1-delayFactor2,1);
-            end
-            dy(1) = KeB*(1./(1+(BLag1/KiB).^pExpB)) - KdBP*B*P - KdB*B + KeB2 + eta_B;
-            dy(2) = KeP*(BLag2^pExpP./(BLag2^pExpP+KaP^pExpP)) - KdBP*B*P - KdP*P + KeP2 + eta_P;
-            dy(3) = KeP*(1./(1+(KaP/B).^pExpP)) - KdLuc*L + KeP2 + eta_L;
-            y(i,:) = y(i-1,:) + dy*dt;
-            if any(y(i,:) < 0)
-                yCur = y(i,:);
-                yCur(yCur < 0) = 0;
-                y(i,:) = yCur;
-            end
+    function dluc = odeLuc(t, luc, tStored, yVals)
+        if t > lags(4)
+            BCur = interp1(tStored, yVals(:,1), t-lags(4));
+            PCur = interp1(tStored, yVals(:,2), t-lags(4));
+        else
+            BCur = yVals(1,1);
+            PCur = yVals(1,2);
         end
+        KeP_self = KeP0_self*(1./(1+(PCur/KiP).^pExpP1));
+        dluc = KeP*(1./(1+(KaP/BCur).^pExpP0)) + KeP_self - KdLuc*luc + KeP2;
     end
+
 end
