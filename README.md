@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10015614.svg)](https://doi.org/10.5281/zenodo.10015614)
+
 # MechanoCircadian repository
 MATLAB-based implementation of the coupling between the cell Circadian clock and mechanotransduction, associated with the manuscript by Emmet Francis and Padmini Rangamani, "Computational modeling predicts mechanotransduction-mediated changes to Circadian oscillations in mammalian cells".
 
