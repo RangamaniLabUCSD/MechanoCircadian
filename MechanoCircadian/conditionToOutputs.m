@@ -19,6 +19,7 @@ function [periodTest, amplTest, tOut, yOut, rawOutput, oscDecayRate] = ...
 %             'KeR2,Y', 'KYR', 'KeR2,M', 'KMR', 'nP1', 'nYR', 'nMR'};
 %       * stiffness: substrate stiffness in kPa
 %       * inhibVec: vector of inhibition parameters (length=9 or 10)
+%           set to default if empty vector []
 %           1: actin polym inhibition: factor multiplying kra
 %           2: ROCK inhibition: factor multiplying param 55, 69 (epsilon and tau - ROCK mediated catalysis)
 %           3: MRTF-Circadian coupling inhibition - factor multiplying
@@ -85,7 +86,7 @@ function [periodTest, amplTest, tOut, yOut, rawOutput, oscDecayRate] = ...
         Ke3 = varargin{4};
     end
     % run MechanoCircadianMOdel for current conditions
-    [t,y,ySS] = MechanoCircadianModel([0 maxTime], [stiffness,inf,0], p, inhibVec, popVar, noiseLevel, Ke3);
+    [t,y,ySS] = MechanoCircadianModel([0 maxTime], stiffness, p, inhibVec, popVar, noiseLevel, Ke3);
     % Return default vector if any nonreal or negative solutions
     if any(~isreal(y(:))) || any(y(:)<0)
         periodTest = zeros(1,size(y,2));

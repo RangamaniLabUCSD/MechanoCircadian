@@ -1,14 +1,12 @@
-function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
+function [SSVar, tauVals] = MechanoSS(stiffness, inhibVec, pSol, varargin)
     % function returning the steady state state variable values for YAP/TAZ
     % and MRTF mechanotransduction model (developed from VCell)
 
     % inputs:
-    %     stiffnessParam is a 2 element vector with the stiffness in kPa (first
-    %       element) and the time scale of stiffness increase in s (second el)
-    %       only stiffnessParam(1) is used here (stiffness is assumed to be
-    %       equal to this value at SS)
+    %     stiffness: substrate stiffness in kPa
     %
-    %     inhibVec: vector of inhibition parameters (length=9)
+    %     inhibVec: vector of inhibition parameters (length=9 or 10)
+    %       set to default if empty vector []
     %       1: actin polym inhibition: factor multiplying kra
     %       2: ROCK inhibition: factor multiplying param 55, 69 (epsilon and tau - ROCK mediated catalysis)
     %       3: MRTF-Circadian coupling inhibition (not used here)
@@ -34,7 +32,10 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
 
     if length(inhibVec)==9
         inhibVec(10) = 1;
+    elseif isempty(inhibVec) % set to defaults
+        inhibVec = [1, 1, 1, 0, 0, 1, 1, 3000, 1, 1];
     end
+    
     if isempty(varargin)
         popVar = 0;
     elseif length(varargin)==1
@@ -147,8 +148,7 @@ function [SSVar, tauVals] = MechanoSS(stiffnessParam, inhibVec, pSol, varargin)
         0.001660538783162726;		% param(103) is 'KMOLE'
         ];
     
-    param(17) = stiffnessParam(1); % substrate stiffness
-    param(104) = stiffnessParam(2); % unused
+    param(17) = stiffness; % substrate stiffness
     param(78) = pSol(19); % substrate stiffness sensitivity (C)
     
     % load inhibition parameters 

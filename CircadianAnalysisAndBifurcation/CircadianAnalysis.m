@@ -53,9 +53,9 @@ if nCoupleTest
     KdPVals = p(11)*ones(size(nCoupleVals));%[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
     KdRVals = p(16)*ones(size(nCoupleVals));%[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(16))
 elseif KdTest %#ok<UNRCH>
-    KdBVals = p(6)*ones(size(nCoupleVals));%[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
-    KdPVals = p(11)*ones(size(nCoupleVals));%[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
-    KdRVals = p(16)*ones(size(nCoupleVals));%[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(16))
+    KdBVals = p(6)*[1,0.1,3,10,1,1,1,1,1,1]; % KdB (p(6))
+    KdPVals = p(11)*[1,1,1,1,.2,.5,2,1,1,1]; % KdP (p(11))
+    KdRVals = p(16)*[1,1,1,1,1,1,1,.1,10,30]; % KdR (p(16))
     nCoupleVals = 2*ones(size(KdBVals));
 end
 circStoreCell = cell(size(KdBVals));

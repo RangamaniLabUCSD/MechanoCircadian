@@ -1,4 +1,5 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10015614.svg)](https://doi.org/10.5281/zenodo.10015614)
+Main repository: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10015614.svg)](https://doi.org/10.5281/zenodo.10015614)
+Results files: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12127000.svg)](https://doi.org/10.5281/zenodo.12127000)
 
 # MechanoCircadian repository
 MATLAB-based implementation of the coupling between the cell Circadian clock and mechanotransduction, associated with the manuscript by Emmet Francis and Padmini Rangamani, "Computational modeling predicts mechanotransduction-mediated changes to Circadian oscillations in mammalian cells".
@@ -11,6 +12,8 @@ To run the code in this repository, you need to first install the following:
 * Required MATLAB toolboxes: Communications Toolbox, Curve Fitting Toolbox, Global Optimization Toolbox, Optimization Toolbox, Signal Processing Toolbox, Statistics and Machine Learning Toolbox.
 
 Scripts used to generate the figures in the paper are organized into 5 main folders, "CircadianAnalysisAndBifurcation" (Figures 3, S1, S4, S6), "MechanoAnalysis" (Fig 1B, Fig 3), "SensitivityAndFitting" (Fig 2, Fig S2, Fig S3), and "MechanoCircadian" (Figs 1B-C, 3, 4, 5, 6, S5, S7, S8). We break down the associated files below.
+We also provide a minimal script, "minimum_driver.m" for a quick start running this model with a single set of maximum likelihood parameters.
+Results files used to generate figures in the final manuscript can be downloaded from [this Zenodo repository](https://doi.org/10.5281/zenodo.12127000), and placed in a folder `results` that is not tracked by git.
 
 ## CircadianAnalysisAndBifurcation
 * CircadianAnalysis: Includes the 2 DDE system to model Circadian oscillations, used to plot phase diagrams of oscillation period in the YAP/TAZ-MRTF phase plane for different parameter combinations.
@@ -41,6 +44,10 @@ In addition to these main folders, we have several utility functions sorted into
 All data used in model calibration (from Xiong et al 2022, Journal of Cell Science) stored in Datasets folder.
 To load this data in, see MechanoCircadian_fit file.
 Each file contains mean values in the first column and standard deviation in the second column.
+
+## Simulation results
+All results used for making figures in the final manuscripts are stored in results folder.
+See descriptions of these files in results/README.txt
 
 ## Contributing guidelines
 Please feel free to submit any issues to this Github repository or suggest modifications by submitting a pull request.
