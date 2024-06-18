@@ -1,15 +1,10 @@
-function [T,Y] = MechanoOnlyModel(timeSpan,stiffnessParam)
+function [T,Y] = MechanoOnlyModel(timeSpan,stiffness)
 % YAP/TAZ and MRTF mechanotransduction model, originally implemented in
 % VCell - based on Scott et al 2021 and Sun et al 2016
 %
 % input:
 %     timeSpan is a vector of start and stop times (e.g. timeSpan = [0 10.0])
-%     stiffnessParam is a 2 element vector with the stiffness in kPa (first
-%     element) and the time scale of stiffness increase in s (second el)
-%
-%     Currently the time-dependent stiffness is given by
-%     stiffnessParam(1)*t / stiffnessParam(2)
-%     If stiffnessParam(2) is infinite, stiffness remains constant
+%     stiffness is the substrate stiffness in kPa
 %
 % output:
 %     T is the vector of times
@@ -159,8 +154,7 @@ param = [
 	0.001660538783162726;		% param(103) is 'KMOLE'
 ];
 
-param(17) = stiffnessParam(1);
-param(104) = stiffnessParam(2);
+param(17) = stiffness(1);
 
 %
 % invoke the integrator
@@ -216,11 +210,7 @@ function dydt = f(t,y,p,~)
 	kdf = p(14);
 	krNPC = p(15);
 	% ROCKA_init_uM = p(16);
-    if isinf(p(104))
-        Emol = p(17);
-    else
-        Emol = p(17)*t/p(104);
-    end
+    Emol = p(17);
 	kcatcof = p(18);
 	SAV = p(19);
 	kdrock = p(20);

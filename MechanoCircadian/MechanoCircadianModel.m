@@ -1,4 +1,4 @@
-function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, inhibVec, varargin)
+function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffness, pSol, inhibVec, varargin)
 % Function implementing DDE system for modeling
 % mechanotransduction-Circadian coupling. Calls MechanoSS to find SS
 % nuclear concentrations of YAP/TAZ and MRTF.
@@ -7,10 +7,7 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 % input:
 %     * timeSpan: two element vector [tStart tEnd] in seconds
 %
-%     * stiffnessParam is a 2 element vector with the stiffness in kPa (first
-%       element) and the time scale of stiffness increase in s (second el)
-%       only stiffnessParam(1) is used here (stiffness is assumed to be
-%       equal to this value at SS)
+%     * stiffness: the substrate stiffness in kPa
 % INPUTS:
 %     * pSol: parameter solution vector - length 45, contains all calibrated
 %           values from mechano-Circadian model (see Tables S1 and S4 in paper).
@@ -24,7 +21,8 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
 %             'MRTFRelease','KinsoloMRTF','Kin2MRTF','Kdim','Kcap',...
 %             'KeP1', 'KiP', 'KdR', 'tauR',...
 %             'KeR2,Y', 'KYR', 'KeR2,M', 'KMR', 'nP1', 'nYR', 'nMR'};
-%       * inhibVec: vector of inhibition parameters (length=9 or 10)
+%       * inhibVec: vector of inhibition parameters (length=9 or 10),
+%           set to default if empty vector []
 %           1: actin polym inhibition: factor multiplying kra
 %           2: ROCK inhibition: factor multiplying param 55, 69 (epsilon and tau - ROCK mediated catalysis)
 %           3: MRTF-Circadian coupling inhibition - factor multiplying
@@ -116,12 +114,14 @@ function [t,y, SSVals] = MechanoCircadianModel(timeSpan, stiffnessParam, pSol, i
     nCouple6 = pSol(45);
 
     % inhibit MRTF-Circadian coupling if applicable
-    magCouple2 = magCouple2 * inhibVec(3);
-    magCouple4 = magCouple4 * inhibVec(3);
+    if ~isempty(inhibVec)
+        magCouple2 = magCouple2 * inhibVec(3);
+        magCouple4 = magCouple4 * inhibVec(3);
+    end
     
     lags = [tauB, tauP, tauR, 1*3600]; % 4th lag is arbitrary, just determines phase of reporter
 
-    SSVals = MechanoSS(stiffnessParam, inhibVec, pSol, popVar);
+    SSVals = MechanoSS(stiffness, inhibVec, pSol, popVar);
     YAPTAZnuc_SS = SSVals(15);
     MRTFnuc_SS = SSVals(25);
     mechanoStartEffect = false; % optionally consider effect of YAP/TAZ and MRTF jumping in value after first time lag

@@ -1,6 +1,6 @@
 %% Plot mechanotransduction dynamics with default parameters (for Fig 1B)
 maxTime = 3600*6;
-[T,Y] = MechanoOnlyModel([0 maxTime],[100,inf]);
+[T,Y] = MechanoOnlyModel([0 maxTime],100);
 figure
 hold on
 plot(T/60,Y(:,15)./(Y(:,17)+Y(:,18)),'LineWidth',1);
@@ -36,8 +36,7 @@ GactinEq = zeros(size(stiffnessVals));
 for i = 1:length(stiffnessVals)
     inhibVec = [1,1,1,0, 0];
     inhibVec(6:9) = [1,1,3000,1];
-    stiffnessVec = [stiffnessVals(i),inf];
-    SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
+    SSVar = MechanoSS(stiffnessVals(i), inhibVec, pSol);
     MRTFEq(i) = SSVar(25)/SSVar(26);
     YAPTAZEq(i) = SSVar(15)/(SSVar(17)+SSVar(18));
     FactinEq(i) = SSVar(5);
@@ -55,8 +54,7 @@ MRTFEq = zeros(size(cytDVals));
 for i = 1:length(cytDVals)
     inhibVec = [1,1,1,0, cytDVals(i)];
     inhibVec(6:9) = [1,1,3000,1];
-    stiffnessVec = [1e7,inf,0];
-    SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
+    SSVar = MechanoSS(1e7, inhibVec, pSol);
     MRTFEq(i) = SSVar(25)/SSVar(26);
     % FActinEq(i) = SSVar(5);
     % GActinEq(i) = SSVar(9);
@@ -73,8 +71,7 @@ for i = 1:length(jaspVals)
     actinPolyFactor = 1 + (1+pSol(27))*jaspVals(i)/pSol(28);
     inhibVec = [actinPolyFactor,1,1,0, 0];
     inhibVec(6:9) = [1,1,3000,1];
-    stiffnessVec = [1e7,inf,0];
-    SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
+    SSVar = MechanoSS(1e7, inhibVec, pSol);
     MRTFEq(i) = SSVar(25)/SSVar(26);
 end
 figure
@@ -118,8 +115,7 @@ for k = 1:size(popParam,1)
     for i = 1:length(stiffnessVals)
         inhibVec = [1,1,1,0,0];
         inhibVec(6:9) = [1,1,3000,1];
-        stiffnessVec = [stiffnessVals(i),inf,0];
-        SSVar = MechanoSS(stiffnessVec, inhibVec, pCur);
+        SSVar = MechanoSS(stiffnessVals(i), inhibVec, pCur);
         MRTFEq(k,i) = SSVar(25)/SSVar(26);
     end
 end
@@ -174,10 +170,9 @@ for i = 1:length(cytDCell)
     GActinCell{i} = zeros(size(cytDCell{i}));
     for j = 1:length(cytDCell{i})
         actinPolyFactor = 1 / (1 + (latBCell{i}(j)/pSol(26))) + (1 + pSol(27))*jaspCell{i}(j) / pSol(28);
-        inhibVec = [actinPolyFactor,1,1,1, cytDCell{i}(j)];
+        inhibVec = [actinPolyFactor,1,1,0, cytDCell{i}(j)];
         inhibVec(6:9) = [1,1,3000,1];
-        stiffnessVec = [stiffnessCell{i}(j),inf,0];
-        SSVar = MechanoSS(stiffnessVec, inhibVec, pSol);
+        SSVar = MechanoSS(stiffnessCell{i}(j), inhibVec, pSol);
         MRTFCell{i}(j) = SSVar(25)/SSVar(26);
         YAPTAZCell{i}(j) = SSVar(15)/(SSVar(17)+SSVar(18));
         FActinCell{i}(j) = SSVar(5);
