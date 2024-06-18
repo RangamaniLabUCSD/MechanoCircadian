@@ -1,5 +1,5 @@
 %% Minimal test of mechano-circadian model
-load('results/pSol_MAP.mat') % load pSol associated with maximum a posteriori parameters
+load('pSol_MAP.mat') % load pSol associated with maximum a posteriori parameters
 stiffnessVals = [1,19,300,1e7]; % substrate stiffness values to test in kPa
 timeSpan = [0, 3600*24*5]; % time span in seconds (5 days here)
 figure
