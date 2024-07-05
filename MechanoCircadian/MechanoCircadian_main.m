@@ -85,7 +85,7 @@ refConcR = 0.07;
 maxTime = 240*3600;
 inhibVec = [1, 1, 1, 0, 0, 1]; %[actin polym (kra), ROCK, MRTF, YAP overexpress, cytD, LATS]
 inhibVec(7:9) = [1,3000,1];
-[t, y, ySS] = MechanoCircadianModel([0 maxTime], [100,inf], pSol, inhibVec, 0);%kraMult(i));
+[t, y, ySS] = MechanoCircadianModel([0 maxTime], 100, pSol, inhibVec, 0);
 [~,locs] = findpeaks(y(:,2));
 tShift = t(locs(3))/(3600);
 figure
